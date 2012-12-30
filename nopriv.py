@@ -42,6 +42,8 @@ id_list = ids.split()
 breakOut = False
 
 
+
+
 def returnHeader(title, inclocation="inc", layout=1):
     if layout is 1:
         response = """
@@ -105,7 +107,17 @@ def returnFooter():
 def printQuote():
     quotes = ['Come on, shut off that damn alarm and I promise I\'ll never violate you again.', 'I\'ve become romantically involved with a hologram. If that\'s possible.', 'Listen to me very carefully because I\'m only going to say this once. Coffee - black.', 'Computer, prepare to eject the warp core - authorization Torres omega five nine three!', 'The procedure is quite simple. I\'ll drill an opening into your skull percisely two milimeters in diameter and then use a neuralyte probe to extract a sample of your parietal lobe weighing approximately one gram']
     return choice(quotes)
-
+    
+class DecodeError(Exception):
+    pass
+    
+def decode_string(string):
+    for charset in ("utf-8", 'latin-1', 'iso-8859-1', 'us-ascii', 'windows-1252','us-ascii'):
+        try:
+            return cgi.escape(unicode(string, charset)).encode('ascii', 'xmlcharrefreplace')
+        except Exception:
+            continue
+    raise DecodeError("Could not decode string")
 
 def return_message(message_id):
     global mail
@@ -118,24 +130,9 @@ def return_message(message_id):
         email_subject = cgi.escape(unicode(decoded_subject, subject_encoding)).encode('ascii', 'xmlcharrefreplace')
     else:
         try:
-            email_subject = cgi.escape(unicode(decoded_subject, 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-        except Exception:
-            try:
-                email_subject = cgi.escape(unicode(decoded_subject, 'latin-1')).encode('ascii', 'xmlcharrefreplace')
-            except Exception:
-                try:
-                    email_subject = cgi.escape(unicode(decoded_subject, 'iso-8859-1')).encode('ascii', 'xmlcharrefreplace')
-                except Exception:
-                    try:
-                        email_subject = cgi.escape(unicode(decoded_subject, 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                    except Exception:
-                        try:
-                            email_subject = cgi.escape(unicode(decoded_subject, 'windows-1252')).encode('ascii', 'xmlcharrefreplace')
-                        except Exception:
-                            try:
-                                 email_subject = cgi.escape(unicode(decoded_subject, 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                            except Exception:
-                                email_subject = "Error decoding subject."
+            email_subject = decode_string(decoded_subject)
+        except DecodeError:
+            email_subject = "Error decoding subject."
     if not email_subject:
         email_subject = "No Subject"
     
@@ -145,25 +142,10 @@ def return_message(message_id):
         email_to = cgi.escape(unicode(decoded_to, to_encoding)).encode('ascii', 'xmlcharrefreplace')
     else:
         try:
-            email_to = cgi.escape(unicode(decoded_to, 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-        except Exception:
-            try:
-                email_to = cgi.escape(unicode(decoded_to, 'latin-1')).encode('ascii', 'xmlcharrefreplace')
-            except Exception:
-                try:
-                    email_to = cgi.escape(unicode(decoded_to, 'iso-8859-1')).encode('ascii', 'xmlcharrefreplace')
-                except Exception:
-                    try:
-                        email_to = cgi.escape(unicode(decoded_to, 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                    except Exception:
-                        try:
-                            email_to = cgi.escape(unicode(decoded_to, 'windows-1252')).encode('ascii', 'xmlcharrefreplace')
-                        except Exception:
-                            try:
-                                 email_to = cgi.escape(unicode(decoded_to, 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                            except Exception:
-                                email_to = "Error decoding Receiver."
-                                print "Error decoding Receiver"
+             email_to = decode_string(decoded_to)
+        except DecodeError:
+            email_to = "Error decoding Receiver."
+            print "Error decoding Receiver"
     if not email_to:
         email_to = "No Receiver"
 
@@ -176,25 +158,10 @@ def return_message(message_id):
         email_from = cgi.escape(unicode(decoded_from, from_encoding)).encode('ascii', 'xmlcharrefreplace')
     else:
         try:
-            email_from = cgi.escape(unicode(decoded_from, 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-        except Exception:
-            try:
-                email_from = cgi.escape(unicode(decoded_from, 'latin-1')).encode('ascii', 'xmlcharrefreplace')
-            except Exception:
-                try:
-                    email_from = cgi.escape(unicode(decoded_from, 'iso-8859-1')).encode('ascii', 'xmlcharrefreplace')
-                except Exception:
-                    try:
-                        email_from = cgi.escape(unicode(decoded_from, 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                    except Exception:
-                        try:
-                            email_from = cgi.escape(unicode(decoded_from, 'windows-1252')).encode('ascii', 'xmlcharrefreplace')
-                        except Exception:
-                            try:
-                                 email_from = cgi.escape(unicode(decoded_from, 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                            except Exception:
-                                email_from = "Error decoding sender address."
-                                print "Error decoding sender address"
+            email_from = decode_string(decoded_from)
+        except DecodeError:
+            email_from = "Error decoding sender address."
+            print "Error decoding sender address"
     if not email_from:
         email_from = "No sender."
     term_from = str(decoded_from[0][0])
@@ -242,22 +209,10 @@ def return_message(message_id):
                     contentOfMail['text'] += cgi.escape(str(decoded_contents)).encode('ascii', 'xmlcharrefreplace')
             except Exception:
                 try:
-                    contentOfMail['text'] += cgi.escape(unicode(str(decoded_contents), 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-                except Exception:
-                    try:
-                        contentOfMail['text'] += cgi.escape(unicode(str(decoded_contents), 'latin-1')).encode('ascii', 'xmlcharrefreplace')
-                    except Exception:
-                        try:
-                            contentOfMail['text'] += cgi.escape(unicode(str(decoded_contents), 'iso-8859-1')).encode('ascii', 'xmlcharrefreplace')
-                        except Exception:
-                            try:
-                                contentOfMail['text'] += cgi.escape(unicode(str(decoded_contents), 'us-ascii')).encode('ascii', 'xmlcharrefreplace')
-                            except Exception:
-                                try:
-                                    contentOfMail['text'] += cgi.escape(unicode(str(decoded_contents), 'windows-1252')).encode('ascii', 'xmlcharrefreplace')
-                                except Exception:
-                                    contentOfMail['text'] += "Error decoding mail contents."
-                                    print("Error decoding mail contents")
+                    contentOfMail['text'] +=  decode_string(decoded_contents)
+                except DecodeError:
+                    contentOfMail['text'] += "Error decoding mail contents."
+                    print("Error decoding mail contents")
             continue
         elif cType == 'text/html':
             decoded_contents = part.get_payload(decode=True)
@@ -268,22 +223,10 @@ def return_message(message_id):
                     contentOfMail['html'] += str(decoded_contents).encode('ascii', 'xmlcharrefreplace')
             except Exception:
                 try:
-                    contentOfMail['html'] += unicode(str(decoded_contents), 'utf-8').encode('ascii', 'xmlcharrefreplace')
-                except Exception:
-                    try:
-                        contentOfMail['html'] += unicode(str(decoded_contents), 'latin-1').encode('ascii', 'xmlcharrefreplace')
-                    except Exception:
-                        try:
-                            contentOfMail['html'] += unicode(str(decoded_contents), 'iso-8859-1').encode('ascii', 'xmlcharrefreplace')
-                        except Exception:
-                            try:
-                                contentOfMail['html'] += unicode(str(decoded_contents), 'us-ascii').encode('ascii', 'xmlcharrefreplace')
-                            except Exception:
-                                try:
-                                    contentOfMail['html'] += unicode(str(decoded_contents), 'windows-1252').encode('ascii', 'xmlcharrefreplace')
-                                except Exception:
-                                    contentOfMail['html'] += "Error decoding mail contents."
-                                    print("Error decoding mail contents")
+                    contentOfMail['html'] += decode_string(decoded_contents)
+                except DecodeError:
+                    contentOfMail['html'] += "Error decoding mail contents."
+                    print("Error decoding mail contents")
 
             continue
         if part.get_content_maintype() == 'multipart':

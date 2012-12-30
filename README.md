@@ -9,7 +9,7 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 ### Screenshots
 
 #### Running the program
-<a href="http://i.imgur.com/iH330.png"<img src="http://i.imgur.com/iH330.png" width=400 height=400 /></a>
+<a href="http://i.imgur.com/iH330.png"><img src="http://i.imgur.com/iH330.png" width=400 height=400 /></a>
 
 #### Overview page 
 <a href="http://i.imgur.com/5TvtU.jpg"><img src="http://i.imgur.com/5TvtU.jpg" width=400 height=400 /></a>

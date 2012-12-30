@@ -164,7 +164,7 @@ def return_message(message_id):
             print "Error decoding sender address"
     if not email_from:
         email_from = "No sender."
-    term_from = str(decoded_from[0][0])
+    term_from = str(decoded_from)
    
     decoded_contents = ""
     response = {}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Copyright (C) 2013 Remy van Elst
 
 #     This program is free software: you can redistribute it and/or modify
@@ -33,10 +34,10 @@ from quopri import decodestring
 # Do not edit above here  #
 ###########################
 
-IMAPSERVER = ""
-IMAPLOGIN = ""
-IMAPPASSWORD = ""
-IMAPFOLDER = ["", "", ""]
+# IMAPSERVER = ""
+# IMAPLOGIN = ""
+# IMAPPASSWORD = ""
+# IMAPFOLDER = ["", "", ""]
 ssl = True
 
 # IMAPFOLDER = ["INBOX"]
@@ -131,7 +132,12 @@ def decode_string(string):
             continue
     raise DecodeError("Could not decode string")
 
+attCount = 0
+lastAttName = ""
+
 def return_message(mail, mailFolder, id_list, message_id):
+    global attCount
+    global lastAttName
     result, data = mail.fetch(str(message_id), "(RFC822)")
     raw_email = data[0][1]
     email_message = email.message_from_string(str(raw_email))
@@ -244,8 +250,16 @@ def return_message(mail, mailFolder, id_list, message_id):
             continue
         if part.get('Content-Disposition') == None:
             continue
-        decoded_filename = decode_header(part.get_filename())
-        attFileName = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", str(decoded_filename[0][0]).replace(":", "").replace("/", "").replace("\\", ""))
+        decoded_filename = u"".join(part.get_filename())
+        
+        attFileName = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", decoded_filename.replace(":", "").replace("/", "").replace("\\", ""))
+
+        if lastAttName == attFileName:
+            attFileName = str(attCount) + "." + attFileName
+        
+        lastAttName = attFileName
+        attCount += 1
+            
 
         att_path = os.path.join(mailFolder, attDate, str(message_id), attFileName)
         att_locs = []

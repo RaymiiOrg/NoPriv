@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2012 Remy van Elst
+# Copyright (C) 2013 Remy van Elst
 
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -24,6 +24,9 @@ import os
 import base64
 import cgi
 import sys
+import shutil
+import errno
+import datetime
 from quopri import decodestring
 
 ###########################
@@ -33,13 +36,14 @@ from quopri import decodestring
 IMAPSERVER = ""
 IMAPLOGIN = ""
 IMAPPASSWORD = ""
-IMAPFOLDER = "INBOX"
+IMAPFOLDER = ["", "", ""]
 ssl = True
 
-# IMAPFOLDER = "INBOX"
-# IMAPFOLDER = "[Gmail]/Alle berichten"
-# IMAPFOLDER = "[Gmail]/Sent Mail"
-# IMAPFOLDER = "[Gmail]/All Mail"
+# IMAPFOLDER = ["INBOX"]
+# IMAPFOLDER = ["[Gmail]/Alle berichten"]
+# IMAPFOLDER = ["[Gmail]/Sent Mail"]
+# IMAPFOLDER = ["[Gmail]/All Mail"]
+# IMAPFOLDER = ["[Gmail]/Sent Mail", "INBOX", "[Gmail]/Starred", "Captains_Log", "Important"]
 
 ###########################
 # Do not edit below here  #
@@ -50,13 +54,6 @@ if ssl is True:
 if ssl is False:
     mail = imaplib.IMAP4(IMAPSERVER)
 mail.login(IMAPLOGIN, IMAPPASSWORD)
-mail.select(IMAPFOLDER)
-result, data = mail.search(None, "ALL")
-ids = data[0]
-id_list = ids.split()
-breakOut = False
-
-
 
 
 def returnHeader(title, inclocation="inc", layout=1):
@@ -122,10 +119,10 @@ def returnFooter():
 def printQuote():
     quotes = ['Come on, shut off that damn alarm and I promise I\'ll never violate you again.', 'I\'ve become romantically involved with a hologram. If that\'s possible.', 'Listen to me very carefully because I\'m only going to say this once. Coffee - black.', 'Computer, prepare to eject the warp core - authorization Torres omega five nine three!', 'The procedure is quite simple. I\'ll drill an opening into your skull percisely two milimeters in diameter and then use a neuralyte probe to extract a sample of your parietal lobe weighing approximately one gram']
     return choice(quotes)
-    
+
 class DecodeError(Exception):
     pass
-    
+
 def decode_string(string):
     for charset in ("utf-8", 'latin-1', 'iso-8859-1', 'us-ascii', 'windows-1252','us-ascii'):
         try:
@@ -134,8 +131,7 @@ def decode_string(string):
             continue
     raise DecodeError("Could not decode string")
 
-def return_message(message_id):
-    global mail
+def return_message(mail, mailFolder, id_list, message_id):
     result, data = mail.fetch(str(message_id), "(RFC822)")
     raw_email = data[0][1]
     email_message = email.message_from_string(str(raw_email))
@@ -150,7 +146,7 @@ def return_message(message_id):
             email_subject = "Error decoding subject."
     if not email_subject:
         email_subject = "No Subject"
-    
+
     decoded_to = decode_header(email_message['To'])[0][0]
     to_encoding = decode_header(email_message['To'])[0][1]
     if to_encoding:
@@ -165,7 +161,7 @@ def return_message(message_id):
         email_to = "No Receiver"
 
     content_type = decode_header(str(email_message['Content-Transfer-Encoding']))
-   
+
 
     decoded_from = decode_header(email_message['From'])[0][0]
     from_encoding = decode_header(email_message['From'])[0][1]
@@ -180,7 +176,7 @@ def return_message(message_id):
     if not email_from:
         email_from = "No sender."
     term_from = str(decoded_from)
-   
+
     decoded_contents = ""
     response = {}
     response['attachment'] = False
@@ -202,15 +198,15 @@ def return_message(message_id):
     contentOfMail['text'] = ""
     contentOfMail['html'] = ""
 
-    att_dir = os.path.join(attDate, str(message_id))
+    att_dir = os.path.join(mailFolder, attDate, str(message_id))
     if not os.path.exists(att_dir):
         os.makedirs(str(att_dir))
-        print("Creating directory %s for attachments.") % (att_dir)
-    fpIndex = open(att_dir + "/index.html", "w")
-    fpIndex.write("<html>\n<head>\n<title>Attachments for email " + str(message_id) + "</title>\n</head>\n<body>\n")
-    fpIndex.write("<h1>Attachments for email " + str(message_id) + "</h1>\n")
-    fpIndex.write("<ul>\n")
-    fpIndex.close()
+        # print("Creating directory %s for attachments.") % (att_dir)
+    with open(att_dir + "/index.html", "w") as fpIndex:
+        fpIndex.write("<html>\n<head>\n<title>Attachments for email " + str(message_id) + "</title>\n</head>\n<body>\n")
+        fpIndex.write("<h1>Attachments for email " + str(message_id) + "</h1>\n")
+        fpIndex.write("<ul>\n")
+        fpIndex.close()
 
     for part in email_message.walk():
         cType = part.get_content_type()
@@ -250,198 +246,350 @@ def return_message(message_id):
             continue
         decoded_filename = decode_header(part.get_filename())
         attFileName = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", str(decoded_filename[0][0]).replace(":", "").replace("/", "").replace("\\", ""))
-        
-        att_path = os.path.join(attDate, str(message_id), attFileName)
+
+        att_path = os.path.join(mailFolder, attDate, str(message_id), attFileName)
         att_locs = []
         fp = open(att_path, 'wb')
         try:
             fp.write(part.get_payload(decode=True))
-            print("Saved attachment \"%s\".") % attFileName 
+            # print("Saved attachment \"%s\".") % attFileName
         except Exception as e:
             fp.write("Error writing attachment: " + str(e) + ".\n")
             print("Error writing attachment: " + str(e) + ".\n")
-        fpIndex = open(att_dir + "/index.html", "a")
-        fpIndex.write("<li><a href=\"" + str(attFileName) + "\">" + str(attFileName) + "</a></li>\n")
-        fpIndex.close() 
-        fp.close()
-        
+        with open(att_dir + "/index.html", "a") as fpIndex:
+            fpIndex.write("<li><a href=\"" + str(attFileName) + "\">" + str(attFileName) + "</a></li>\n")
+            fpIndex.close()
+            fp.close()
+
         response['attachment'] = True
 
 
     response['content'] = contentOfMail
     response['message_id'] = message_id
-    
-        
+
+
     return response
 
-indexCounter = 0
-fileCounter = 1
-print("##############################################")
-print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
-print("# https://raymii.org - NoPriv.py is GPLv3    #")
-print("##############################################")
-print("")
-print("Runtime Information:")
-print(sys.version)
-print("")
-print(printQuote())
-print("")
-for y in range(indexCounter, len(id_list)):
-    if len(id_list) < 50:
-        lastnum = int(id_list[-1])
-        firstnum = int(id_list[-1]) - (len(id_list) - 1)
-    else:
-        lastnum = int(id_list[-1])
-        firstnum = int(id_list[-1]) - 50
-    reportFileName = "email-report-" + str(fileCounter) + ".html"
-    if breakOut is True:
-        indexCounter += 1
-        counter += 1
-        breakOut = False
-        break
-    with open(reportFileName, "w") as emailReportFile:
-        emailReportFile.write(returnHeader("Email Report " + str(fileCounter)))
-        counter = 1
-        maxItems = 50
-        maxList = (len(id_list) - 50)
-        if indexCounter >= maxList:
-            maxItems = len(id_list) - indexCounter
-        if indexCounter == len(id_list):
-            break
-        for z in range(int(indexCounter), int(indexCounter + maxItems)):
-            x = (int(len(id_list)) - int(indexCounter))
-            try:
-                tableitem = return_message(x)
-            except AttributeError as a:
-                print("Error in Message %s: %s") % (z, a)
-                breakOut = True
-                indexCounter += 1
-                counter += 1
-            if breakOut == True:
-                break
-            try:
-                yeardir = str(tableitem['date2'][0])
-            except TypeError:
-                yeardir = "unknown"
-            try:
-                monthdir = str(tableitem['date2'][1])
-                if len(monthdir) == 1:
-                    monthdir = str(0) + monthdir
-            except TypeError:
-                monthdir = "01"
-            itemname = str(tableitem['message_id']) + ".html"
-            emailLink = yeardir + '/' + monthdir + '/' + itemname
-            print("Processing email %s from %s with subject: %s.\n") % (str(indexCounter), str(tableitem['termfrom']), str(tableitem['termsubject']))
-            
-            htmlSubject = cgi.escape(unicode(tableitem['subject'], 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-            htmlFrom = cgi.escape(unicode(tableitem['from'], 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-            emailReportFile.write("<tr>\n")
-            emailReportFile.write("<td>\n")
-            emailReportFile.write(str(indexCounter + 1))
-            emailReportFile.write("</td>\n")
-            emailReportFile.write("<td width=\"20%\">\n")
-            emailReportFile.write(str(tableitem['from']))
-            emailReportFile.write("</td>\n")
-            emailReportFile.write("<td width=\"20%\">\n")
-            emailReportFile.write(str(tableitem['to']))
-            emailReportFile.write("</td>\n")
-            emailReportFile.write("<td width=\"40%\">\n")
-            emailReportFile.write("<a href=\"" + emailLink + "\">")
-            emailReportFile.write(str(tableitem['subject']))
-            emailReportFile.write("</a>\n")
-            emailReportFile.write("</td>\n")
-            emailReportFile.write("<td width=\"20%\">")
-            emailReportFile.write(str(tableitem['date']))
-            emailReportFile.write("</td>\n")
-            emailReportFile.write("</tr>\n")
-            if not os.path.exists(str(yeardir)):
-                os.makedirs(str(yeardir))
-            if not os.path.exists(str(yeardir) + '/' + str(monthdir)):
-                os.makedirs(str(yeardir) + '/' + str(monthdir))
-            with open(yeardir + '/' + monthdir + '/' + itemname, "w") as emailFile:
-                emailFile.write(returnHeader("Email " + str(tableitem['subject']), "../../inc", 2))
-                emailFile.write("<h1>Headers</h1>\n")
-                emailFile.write("<strong>From:</strong> \"" + str(tableitem['from']) + "\"\n")
-                emailFile.write("<br />\n")
-                emailFile.write("<strong>To: </strong>\"" + str(tableitem['to']) + "\"\n")
-                emailFile.write("<br />\n")
-                emailFile.write("<strong>Subject:</strong> \"" + str(tableitem['subject']) + "\"\n")
-                emailFile.write("<br />\n")
-                emailFile.write("<strong>Date:</strong> \"" + str(tableitem['date']) + "\"\n")
-                try:
-                    if tableitem['attachment'] is True:
-                        emailFile.write("<br />\n")
-                        emailFile.write("<a href=\"" + str(tableitem['message_id']) + "/index.html\">")
-                        emailFile.write("Click here to see the attachments of this email.")
-                        emailFile.write("</a>\n")
-                        attFolder = yeardir + '/' + monthdir + '/' + str(tableitem['message_id'])
-                        if not os.path.exists(attFolder):
-                            os.makedirs(attFolder)
-                            print("Creating attachment folder %s from outer loop.") % attFolder
-                        try:
-                            fp = open(yeardir + '/' + monthdir + '/' + str(tableitem['message_id']) + '/index.html', 'a')
-                            fp.write("</ul>\n<br />\n")
-                            fp.write(returnFooter())
-                            fp.close()
-                        except IOError as e:
-                            print("IOError in writing attachment: "), str(e)
-                except IndexError:
-                    emailFile.write("<br />\n")
-                    emailFile.write("This email has no attachments.")
+def returnIndexPage():
+    global IMAPFOLDER
+    global IMAPLOGIN
+    global IMAPSERVER
+    global ssl
+    now = datetime.datetime.now()
+    with open("index.html", "w") as indexFile:
+        indexFile.write(returnHeader("Email Backup Overview Page", layout=2))
+        indexFile.write("<div class=\"col_3\">\n")
+        indexFile.write("<h3>Folders</h3>\n")
+        indexFile.write(returnMenu("", index=True, vertical = True))
+        indexFile.write("</div>\n")
+        indexFile.write("<div class=\"col_7\">\n")
+        indexFile.write("<h3>Information</h3>\n")
+        indexFile.write("<p>This is your email backup. You've made it with ")
+        indexFile.write("<a href=\"https://raymii.org/s/software/Nopriv.py.html\"")
+        indexFile.write(">NoPriv.py from Raymii.org</a>.<br />\n")
+        indexFile.write("On the right you have the folders you wanted to backup.\n")
+        indexFile.write("Click one to get the overview of that folder.<br />\n")
+        indexFile.write("</p>\n<hr />\n<p>\n")
+        indexFile.write("Here is the information you gave me: <br />\n")
+        indexFile.write("IMAP Server: " + IMAPSERVER + "<br />\n")
+        indexFile.write("Username: " + IMAPLOGIN + "<br />\n")
+        indexFile.write("Date of backup: " + str(now) + "<br />\n")
+        indexFile.write("Folders to backup: <br />\n<ul>\n")
+        for folder in IMAPFOLDER:
+            indexFile.write("\t<li><a href = \"" + folder + "/email-report-1.html\">" + folder + "</a></li>\n")
+        indexFile.write("</ul>\n")
+        indexFile.write("<br />Available Folders:<br />")
+        indexFile.write(returnImapFolders(available=True, selected=False, html=True))
+        if ssl:
+            indexFile.write("And, you've got a good mail provider, they support SSL and your backup was made over SSL.<br />\n")
+        else:
+            indexFile.write("No encrption was used when getting the emails.<br />\n")
+        indexFile.write("Thats all folks, have a nice day!</p>\n")
+        indexFile.write("</div>")
+        indexFile.write(returnFooter())
+        indexFile.close()
 
-                emailFile.write("<br />\n")
-                emailFile.write("<a href=\"javascript:history.go(-1)\">Go back</a>\n")
-                emailFile.write("<hr />\n")
-                if tableitem['content']['text']:
-                    emailFile.write("<h1>Email Content (text)</h1>\n")
-                    emailFile.write("<table>\n<tr>\n")
-                    emailFile.write("<td width=\"100%\">\n<pre id=\"nonhtml\">\n")
-                    emailFile.write(decodestring(str(tableitem['content']['text'])))
-                    emailFile.write("</pre>\n</td>\n</tr>\n</table>\n")
-                emailFile.write("<hr />\n")
-                if tableitem['content']['html']:
-                    emailFile.write("<h1>Email Content (HTML)</h1>\n")
-                    emailFile.write("<table style=\"{text-align:left;}\">\n<tr>\n<td width=\"100%\" id=\"withhtml\">\n")
-                    removedHeader = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", str(tableitem['content']['html']), flags=re.DOTALL)
-                    removedHeader = re.sub(r"(?i)</body>.*?</html>", "", removedHeader, flags=re.DOTALL)
-                    removedHeader = re.sub(r"(?i)<!DOCTYPE.*?>", "", removedHeader, flags=re.DOTALL)
-                    removedHeader = re.sub(r"(?i)POSITION: absolute;", "", removedHeader, flags=re.DOTALL)
-                    removedHeader = re.sub(r"(?i)TOP: .*?;", "", removedHeader, flags=re.DOTALL)
-                    emailFile.write(decodestring(removedHeader.replace("<html>", "")))
-                    emailFile.write("</td>\n</tr>\n</table>\n")
-                emailFile.write("<a href=\"javascript:history.go(-1)\">Go back</a>\n")
-                emailFile.write(returnFooter())
-                emailFile.close()
+def returnImapFolders(available=True, selected=True, html=False):
+    global mail
+    response = ""
+    if available:
+        if not html:
+            response += "Available IMAP4 folders:\n"
+        maillist = mail.list()
+        for ifo in sorted(maillist[1]):
+            ifo = re.sub(r"(?i)\(.*\)", "", ifo, flags=re.DOTALL)
+            ifo = re.sub(r"(?i)\".\"", "", ifo, flags=re.DOTALL)
+            ifo = re.sub(r"(?i)\"", "", ifo, flags=re.DOTALL)
+            if html:
+                response += "- %s <br />\n" % ifo
+            else:
+                response += "- %s \n" % ifo
+        response += "\n"
+
+    if selected:
+        if html:
+            response += "Selected folders: <br />\n"
+        else:
+            response += "Selected folders:\n"
+        for sfo in IMAPFOLDER:
+            if html:
+                response += "- %s <br />\n" % sfo
+            else:
+                response += "- %s \n" % sfo
+    if html:    
+        response += "<br />\n"
+    else:
+        response += "\n"
+
+    return response
+
+
+def returnMenu(folderImIn, inDate = False, index = False, vertical = False):
+    global IMAPFOLDER
+
+    folder_number = folderImIn.split('/')
+    folder_number = len(folder_number)
+    dotdotslash = ""
+
+    if vertical:
+        response = '<ul class="menu vertical">'
+    else:
+        response = '<ul class="menu horizontal">'
+
+    if not index:
+        for _ in range(int(folder_number)):
+            dotdotslash += "../"
+        if inDate:
+            dotdotslash += "../../"
+        response += "\t<li><a href=\"" + dotdotslash + "index.html\">Index</a></li>\n"
+
+
+    for folder in IMAPFOLDER:
+        response += "\t<li><a href=\"" + dotdotslash + folder + "/email-report-1.html\">" + folder + "</a></li>\n"
+
+    response += "\t<li><a href=\"javascript:history.go(-1)\">Back</a></li>\n"
+    response += "\n</ul>\n<hr />\n"
+
+    return response
+
+def copy(src, dst):
+    try:
+        shutil.copytree(src, dst)
+    except OSError as exc:
+        if exc.errno == errno.ENOTDIR:
+            shutil.copy(src, dst)
+        elif exc.errno == errno.EEXIST:
+            print("File %s already exists." % src)
+        else: raise
+
+
+
+def returnWelcome():
+    print("##############################################")
+    print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
+    print("# https://raymii.org - NoPriv.py is GPLv3    #")
+    print("##############################################")
+    print("")
+    print("Runtime Information:")
+    print(sys.version)
+    print("")
+    print(printQuote())
+    print("")
+
+def backup(mailFolder):
+    mail.select(mailFolder)
+    try:
+        result, data = mail.search(None, "ALL")
+    except Exception as imaperror:
+        print("Error in IMAP Query: %s." % imaperror)
+        print("Does the imap folder \"%s\" exists?" % mailFolder)
+        exit()
+    ids = data[0]
+    id_list = ids.split()
+    breakOut = False
+
+
+    indexCounter = 0
+    fileCounter = 1
+    for y in range(indexCounter, len(id_list)):
+        if len(id_list) < 50:
+            lastnum = int(id_list[-1])
+            firstnum = int(id_list[-1]) - (len(id_list) - 1)
+        else:
+            lastnum = int(id_list[-1])
+            firstnum = int(id_list[-1]) - 50
+        reportFileName = "email-report-" + str(fileCounter) + ".html"
+        reportFileName = os.path.join(mailFolder, reportFileName)
+        if breakOut is True:
             indexCounter += 1
             counter += 1
-        print("Finishing index file %s") % reportFileName
-        emailReportFile.write("<tr>\n<td colspan=\"6\"><center> \n<br />\n&nbsp;<br /> \n<br /></center>\n</td>\n</tr>\n")
-        emailReportFile.write("<tr>\n<td colspan=\"6\">Total Items in INBOX: %s .</td>\n</tr>\n" % str(len(id_list) - 1))
-        if fileCounter == 1 and len(id_list) > 50:
-            nextLink = "email-report-2.html"
-            endingString = "<tr>\n<td colspan=\"2\">Page 1</td>\n<td colspan=\"3\"><a href=\"%s\">Next page.</a></td>\n</tr>\n" % nextLink
-            emailReportFile.write(endingString)
-            
-        elif fileCounter == 1 and len(id_list) <= 50:
-            endingString = "<tr>\n<td colspan=\"2\">Page 1</td>\n<td colspan=\"3\">No more pages.</td>\n</tr>"
-            emailReportFile.write(endingString)
-        elif fileCounter == (len(id_list) / 50):
-            prevLink = "email-report-" + str(fileCounter - 1) + ".html"
-            endingString = "<tr>\n<td colspan=\"2\">Page %s.</td>\n<td colspan=\"3\">\n<a href=\"%s\">Previous page.</a>\n</td>\n</tr>" % (str(fileCounter), prevLink)
-            emailReportFile.write(endingString)
-            
-        else:
-            prevLink = "email-report-" + str(fileCounter - 1) + ".html"
-            nextLink = "email-report-" + str(fileCounter + 1) + ".html"
-            pageNumber = str(fileCounter)
-            endingString = "<tr>\n<td colspan=\"2\">Page %s.</td><td colspan=\"2\"><a href=\"%s\">Previous page.</a>\n</td>\n" % (pageNumber, prevLink)
-            endingString2 = "<td colspan=\"2\"><a href=\"%s\">Next page.</a>\n</td>\n</tr>" % nextLink
-            emailReportFile.write(endingString)
-            emailReportFile.write(endingString2)
-            
-        emailReportFile.write("    </tbody>\n")
-        emailReportFile.write("</table>\n")
-        emailReportFile.write(returnFooter())
-        emailReportFile.close()
-        fileCounter += 1
+            breakOut = False
+            break
+        with open(reportFileName, "w") as emailReportFile:
+            emailReportFile.write(returnHeader("Email Report " + str(fileCounter)))
+            emailReportFile.write(returnMenu(mailFolder))
+            counter = 1
+            maxItems = 50
+            maxList = (len(id_list) - 50)
+            if indexCounter >= maxList:
+                maxItems = len(id_list) - indexCounter
+            if indexCounter == len(id_list):
+                break
+            for z in range(int(indexCounter), int(indexCounter + maxItems)):
+                x = (int(len(id_list)) - int(indexCounter))
+                try:
+                    tableitem = return_message(mail, mailFolder, id_list, x)
+                except AttributeError as a:
+                    print("Error in Message %s: %s") % (z, a)
+                    breakOut = True
+                    indexCounter += 1
+                    counter += 1
+                if breakOut == True:
+                    break
+                try:
+                    yeardir = str(tableitem['date2'][0])
+                except TypeError:
+                    yeardir = "unknown"
+                try:
+                    monthdir = str(tableitem['date2'][1])
+                    if len(monthdir) == 1:
+                        monthdir = str(0) + monthdir
+                except TypeError:
+                    monthdir = "01"
+                itemname = str(tableitem['message_id']) + ".html"
+                emailLink = yeardir + '/' + monthdir + '/' + itemname
+                print("Processing email %s from %s with subject: %s.\n") % (str(indexCounter), str(tableitem['termfrom']), str(tableitem['termsubject']))
 
+                htmlSubject = cgi.escape(unicode(tableitem['subject'], 'utf-8')).encode('ascii', 'xmlcharrefreplace')
+                htmlFrom = cgi.escape(unicode(tableitem['from'], 'utf-8')).encode('ascii', 'xmlcharrefreplace')
+                emailReportFile.write("<tr>\n")
+                emailReportFile.write("<td>\n")
+                emailReportFile.write(str(indexCounter + 1))
+                emailReportFile.write("</td>\n")
+                emailReportFile.write("<td width=\"20%\">\n")
+                emailReportFile.write(str(tableitem['from']))
+                emailReportFile.write("</td>\n")
+                emailReportFile.write("<td width=\"20%\">\n")
+                emailReportFile.write(str(tableitem['to']))
+                emailReportFile.write("</td>\n")
+                emailReportFile.write("<td width=\"40%\">\n")
+                emailReportFile.write("<a href=\"" + emailLink + "\">")
+                emailReportFile.write(str(tableitem['subject']))
+                emailReportFile.write("</a>\n")
+                emailReportFile.write("</td>\n")
+                emailReportFile.write("<td width=\"20%\">")
+                emailReportFile.write(str(tableitem['date']))
+                emailReportFile.write("</td>\n")
+                emailReportFile.write("</tr>\n")
+
+
+                if not os.path.exists(os.path.join(mailFolder, str(yeardir))):
+                    os.makedirs(os.path.join(mailFolder, str(yeardir)))
+
+                if not os.path.exists(os.path.join(mailFolder, str(yeardir), str(monthdir))):
+                    os.makedirs(os.path.join(mailFolder, str(yeardir), str(monthdir)))
+
+                itemPath = os.path.join(mailFolder, str(yeardir), str(monthdir), str(itemname))
+                with open(itemPath, "w") as emailFile:
+                    emailFile.write(returnHeader("Email " + str(tableitem['subject']), "../../inc", 2))
+                    emailFile.write(returnMenu(mailFolder, inDate = True))
+                    emailFile.write("<strong>From:</strong> \"" + str(tableitem['from']) + "\"\n")
+                    emailFile.write("<br />\n")
+                    emailFile.write("<strong>To: </strong>\"" + str(tableitem['to']) + "\"\n")
+                    emailFile.write("<br />\n")
+                    emailFile.write("<strong>Subject:</strong> \"" + str(tableitem['subject']) + "\"\n")
+                    emailFile.write("<br />\n")
+                    emailFile.write("<strong>Folder:</strong> \"" + str(mailFolder) + "\"\n")
+                    emailFile.write("<br />\n")
+                    emailFile.write("<strong>Date:</strong> \"" + str(tableitem['date']) + "\"\n")
+                    try:
+                        if tableitem['attachment'] is True:
+                            emailFile.write("<br />\n")
+                            emailFile.write("<a href=\"" + str(tableitem['message_id']) + "/index.html\">")
+                            emailFile.write("Click here to see the attachments of this email.")
+                            emailFile.write("</a>\n")
+                            attFolder = os.path.join(mailFolder, str(yeardir), str(monthdir), str(tableitem['message_id']))
+                            attFilePath = os.path.join(mailFolder, str(yeardir), str(monthdir), str(tableitem['message_id']), "index.html")
+                            if not os.path.exists(attFolder):
+                                os.makedirs(attFolder)
+                                print("Creating attachment folder %s from outer loop.") % attFolder
+                            try:
+                                with open(attFilePath, 'a') as fp:
+                                    fp.write("</ul>\n<br />\n")
+                                    fp.write(returnFooter())
+                                    fp.close()
+                            except IOError as e:
+                                print("IOError in writing attachment: "), str(e)
+                    except IndexError:
+                        emailFile.write("<br />\n")
+                        emailFile.write("This email has no attachments.")
+
+                    emailFile.write("<br />\n")
+
+                    emailFile.write("<hr />\n")
+                    if tableitem['content']['text']:
+                        emailFile.write("<!-- Email Content (text) -->\n")
+                        emailFile.write("<table>\n<tr>\n")
+                        emailFile.write("<td width=\"100%\">\n<pre id=\"nonhtml\">\n")
+                        emailFile.write(decodestring(str(tableitem['content']['text'])))
+                        emailFile.write("</pre>\n</td>\n</tr>\n</table>\n")
+                    emailFile.write("<hr />\n")
+                    if tableitem['content']['html']:
+                        emailFile.write("<!-- Email Content (HTML) -->\n")
+                        emailFile.write("<table style=\"{text-align:left;}\">\n<tr>\n<td width=\"100%\" id=\"withhtml\">\n")
+                        removedHeader = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", str(tableitem['content']['html']), flags=re.DOTALL)
+                        removedHeader = re.sub(r"(?i)</body>.*?</html>", "", removedHeader, flags=re.DOTALL)
+                        removedHeader = re.sub(r"(?i)<!DOCTYPE.*?>", "", removedHeader, flags=re.DOTALL)
+                        removedHeader = re.sub(r"(?i)POSITION: absolute;", "", removedHeader, flags=re.DOTALL)
+                        removedHeader = re.sub(r"(?i)TOP: .*?;", "", removedHeader, flags=re.DOTALL)
+                        emailFile.write(decodestring(removedHeader.replace("<html>", "")))
+                        emailFile.write("</td>\n</tr>\n</table>\n")
+                    emailFile.write("<a href=\"javascript:history.go(-1)\">Go back</a>\n")
+                    emailFile.write(returnFooter())
+                    emailFile.close()
+                indexCounter += 1
+                counter += 1
+            print("Finishing index file %s") % reportFileName
+            emailReportFile.write("<tr>\n<td colspan=\"6\"><center> \n<br />\n&nbsp;<br /> \n<br /></center>\n</td>\n</tr>\n")
+            emailReportFile.write("<tr>\n<td colspan=\"6\">Total items in folder <strong>%s</strong>: %s .</td>\n</tr>\n" % (mailFolder, str(len(id_list))))
+            if fileCounter == 1 and len(id_list) > 50:
+                nextLink = "email-report-2.html"
+                endingString = "<tr>\n<td colspan=\"2\">Page 1</td>\n<td colspan=\"3\"><a href=\"%s\">Next page.</a></td>\n</tr>\n" % nextLink
+                emailReportFile.write(endingString)
+
+            elif fileCounter == 1 and len(id_list) <= 50:
+                endingString = "<tr>\n<td colspan=\"2\">Page 1</td>\n<td colspan=\"3\">No more pages.</td>\n</tr>"
+                emailReportFile.write(endingString)
+            elif fileCounter == (len(id_list) / 50):
+                prevLink = "email-report-" + str(fileCounter - 1) + ".html"
+                endingString = "<tr>\n<td colspan=\"2\">Page %s.</td>\n<td colspan=\"3\">\n<a href=\"%s\">Previous page.</a>\n</td>\n</tr>" % (str(fileCounter), prevLink)
+                emailReportFile.write(endingString)
+
+            else:
+                prevLink = "email-report-" + str(fileCounter - 1) + ".html"
+                nextLink = "email-report-" + str(fileCounter + 1) + ".html"
+                pageNumber = str(fileCounter)
+                endingString = "<tr>\n<td colspan=\"2\">Page %s.</td><td colspan=\"2\"><a href=\"%s\">Previous page.</a>\n</td>\n" % (pageNumber, prevLink)
+                endingString2 = "<td colspan=\"2\"><a href=\"%s\">Next page.</a>\n</td>\n</tr>" % nextLink
+                emailReportFile.write(endingString)
+                emailReportFile.write(endingString2)
+
+            emailReportFile.write("    </tbody>\n")
+            emailReportFile.write("</table>\n")
+            emailReportFile.write(returnFooter())
+            emailReportFile.close()
+            fileCounter += 1
+
+
+
+returnWelcome()
+print returnImapFolders()
+
+returnIndexPage()
+
+for folder in IMAPFOLDER:
+    print(("Starting on folder: %s.") % folder)
+    copy("inc", folder + "/inc/")
+    backup(folder)
+    print(("Done with folder: %s.") % folder)
+    print("\n")

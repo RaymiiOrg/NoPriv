@@ -250,8 +250,10 @@ def return_message(mail, mailFolder, id_list, message_id):
             continue
         if part.get('Content-Disposition') == None:
             continue
-        decoded_filename = u"".join(part.get_filename())
-        
+        try:
+            decoded_filename = u"".join(part.get_filename())
+        except TypeError as error:
+            decoded_filename = u"".join("Error_in_parsing_filename")
         attFileName = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", decoded_filename.replace(":", "").replace("/", "").replace("\\", ""))
 
         if lastAttName == attFileName:

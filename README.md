@@ -34,10 +34,21 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 - Supports TEXT email
 - Supports MULTIPART email
 - Saves attachments
+- Supports incremental backups
 - Backups to HTML files for easy browsing
 - Small HTML files can be backed up to external medium more easily, and can be sent over the internet more easily.
+- Also backs up to Maildir for [easy restoring](http://wiki.colar.net/ruby_script_to_upload_convert_a_maildir_inbox_to_an_imap_server)
 
 ### Changelog
+
+New in version 3:
+
+- Supports incremental backups
+- First gets all the email from the account, then processes it.
+- If you stop the backup while running, it will now continue were it left off
+- Unread mails stay unread, but are backed up (before they were marked as read)
+- Restoring possible because it also creates a Maildir
+- Better unicode support
 
 New in version 2:
 
@@ -61,8 +72,9 @@ Open `nopriv.py` in a text editor and edit the following variables (example fill
     IMAPPASSWORD = "Voyager1"
     IMAPFOLDER = ["[Gmail]/Sent Mail", "INBOX", "[Gmail]/Starred", "Captains_Log", "Important"]
     ssl = True
+    incremental_backup = True
 
-(Mind the capital on ssl, `True`/`False`, not `true`/`false`). 
+(Mind the capital on ssl/incremental_backup, `True`/`False`, not `true`/`false`). 
 
 If you use gmail and want to backup all your email, use the "[Gmail]/All Mail" folder. It might be named different if you use another locale, for me with a Dutch gmail account it is named "[Gmail]/Alle Berichten".
 
@@ -85,28 +97,24 @@ If you only have a console, it works just fine in Links2 (see above screenshot):
 
 Python 2.7
 
-Running debian 6 which has python 2.6.6? Execute the following steps to install python 2.7:
-
-    sudo apt-get install python-pip
-
-    sudo pip install pythonbrew
-
-    pythonbrew_install
-
-    source "$HOME/.pythonbrew/etc/bashrc"
-
-    pythonbrew install 2.7.3
-
-    pythonbrew use 2.7.3
+Running debian 6 which has python 2.6.6? [See here how to install python 2.7 on debian 6.](https://raymii.org/s/tutorials/Install_Python_2.7_or_3_on_debian_6.html)
 
 ### Known issues
 
 - Does not work with python3 (Feel free to port/fix it.)
 - Does not handle all charsets. Works best with utf-8 and ascii.
-- Might create an extra index file (example: you have 46 pages, there are 47 in the folder).
-- Some non-rfc compliant emails will look weird, or have weird subjects etc. 
 - No search function.
 - Not able to change default sorting (latest first).
+
+### Info on incremental backups
+
+If you disable incremental backups, the script will run over the folders, create a maildir, create the pages and then move the maildir to `$maildir.date` where date is a timestamp. 
+If you enable incremental backup, it will create a text file `nopriv.txt` with the mail ID's of the folder, so that it know which ID it needs to continue on the next time it is ran. Don't modify this file. If you delete emails from the folder, the incremental function will not work as expected because of differing ID's.
+
+## Info on restoring
+
+Nopriv creates a Maildir folder, which houses all your email. You can restore this maildir folder to an IMAP account either by using the script linked at the top on this page, or use a mail client like Mutt or Evolution and transport it to an imap account via there.
+
 
 ### More Info:
 

@@ -49,6 +49,7 @@ New in version 3:
 - Unread mails stay unread, but are backed up (before they were marked as read)
 - Restoring possible because it also creates a Maildir
 - Better unicode support
+- Attachment page is now also styled
 
 New in version 2:
 

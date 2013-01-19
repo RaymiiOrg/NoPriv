@@ -17,9 +17,12 @@
 
 import imaplib
 import email
+import mailbox
 from email.header import decode_header
+from email.utils import parsedate
 import time
 import re
+from math import ceil
 from random import choice
 import os
 import base64
@@ -28,34 +31,38 @@ import sys
 import shutil
 import errno
 import datetime
+import fileinput
 from quopri import decodestring
 
 ###########################
 # Do not edit above here  #
 ###########################
 
-# IMAPSERVER = ""
-# IMAPLOGIN = ""
-# IMAPPASSWORD = ""
-# IMAPFOLDER = ["", "", ""]
-ssl = True
+IMAPSERVER = ""
+IMAPLOGIN = ""
+IMAPPASSWORD = ""
+IMAPFOLDER = ["", "", ""]
 
-# IMAPFOLDER = ["INBOX"]
-# IMAPFOLDER = ["[Gmail]/Alle berichten"]
-# IMAPFOLDER = ["[Gmail]/Sent Mail"]
-# IMAPFOLDER = ["[Gmail]/All Mail"]
-# IMAPFOLDER = ["[Gmail]/Sent Mail", "INBOX", "[Gmail]/Starred", "Captains_Log", "Important"]
+ssl = True
+incremental_backup = False
 
 ###########################
 # Do not edit below here  #
 ###########################
 enable_html = True
-if ssl is True:
-    mail = imaplib.IMAP4_SSL(IMAPSERVER)
-if ssl is False:
-    mail = imaplib.IMAP4(IMAPSERVER)
-mail.login(IMAPLOGIN, IMAPPASSWORD)
+CreateMailDir = True
+messages_per_overview_page = 50
 
+
+def connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD):
+    if ssl is True:
+        mail = imaplib.IMAP4_SSL(IMAPSERVER)
+    if ssl is False:
+        mail = imaplib.IMAP4(IMAPSERVER)
+    mail.login(IMAPLOGIN, IMAPPASSWORD)
+    return mail
+
+maildir = 'NoPrivMaildir'
 
 def returnHeader(title, inclocation="inc", layout=1):
     if layout is 1:
@@ -79,7 +86,7 @@ def returnHeader(title, inclocation="inc", layout=1):
                                <th>From</th>
                                <th>To</th>
                                <th>Subject</th>
-                                <th>Date</th>
+                               <th>Date</th>
                                </tr>
                            </thead>
                            <tbody>
@@ -116,7 +123,7 @@ def returnFooter():
     """
     return response
 
-
+lastfolder = ""
 def printQuote():
     quotes = ['Come on, shut off that damn alarm and I promise I\'ll never violate you again.', 'I\'ve become romantically involved with a hologram. If that\'s possible.', 'Listen to me very carefully because I\'m only going to say this once. Coffee - black.', 'Computer, prepare to eject the warp core - authorization Torres omega five nine three!', 'The procedure is quite simple. I\'ll drill an opening into your skull percisely two milimeters in diameter and then use a neuralyte probe to extract a sample of your parietal lobe weighing approximately one gram']
     return choice(quotes)
@@ -134,157 +141,97 @@ def decode_string(string):
 
 attCount = 0
 lastAttName = ""
+att_count = 0
+last_att_filename = ""
 
-def return_message(mail, mailFolder, id_list, message_id):
-    global attCount
-    global lastAttName
-    result, data = mail.fetch(str(message_id), "(RFC822)")
-    raw_email = data[0][1]
-    email_message = email.message_from_string(str(raw_email))
-    decoded_subject = decode_header(email_message['Subject'])[0][0]
-    subject_encoding = decode_header(email_message['Subject'])[0][1]
-    if subject_encoding:
-        email_subject = cgi.escape(unicode(decoded_subject, subject_encoding)).encode('ascii', 'xmlcharrefreplace')
-    else:
-        try:
-            email_subject = decode_string(decoded_subject)
-        except DecodeError:
-            email_subject = "Error decoding subject."
-    if not email_subject:
-        email_subject = "No Subject"
+def saveToMaildir(msg, mailFolder):
+    global lastfolder
+    global maildir
 
-    decoded_to = decode_header(email_message['To'])[0][0]
-    to_encoding = decode_header(email_message['To'])[0][1]
-    if to_encoding:
-        email_to = cgi.escape(unicode(decoded_to, to_encoding)).encode('ascii', 'xmlcharrefreplace')
-    else:
-        try:
-             email_to = decode_string(decoded_to)
-        except DecodeError:
-            email_to = "Error decoding Receiver."
-            print "Error decoding Receiver"
-    if not email_to:
-        email_to = "No Receiver"
-
-    content_type = decode_header(str(email_message['Content-Transfer-Encoding']))
-
-
-    decoded_from = decode_header(email_message['From'])[0][0]
-    from_encoding = decode_header(email_message['From'])[0][1]
-    if from_encoding:
-        email_from = cgi.escape(unicode(decoded_from, from_encoding)).encode('ascii', 'xmlcharrefreplace')
-    else:
-        try:
-            email_from = decode_string(decoded_from)
-        except DecodeError:
-            email_from = "Error decoding sender address."
-            print "Error decoding sender address"
-    if not email_from:
-        email_from = "No sender."
-    term_from = str(decoded_from)
-
-    decoded_contents = ""
-    response = {}
-    response['attachment'] = False
-    response['from'] = str(email_from)
-    response['termfrom'] = term_from
-    response['to'] = str(email_to)
-    response['subject'] = str(email_subject)
-    response['termsubject'] = decoded_subject
+    mbox = mailbox.Maildir(maildir, factory=mailbox.MaildirMessage, create=True) 
+    folder = mbox.add_folder(mailFolder)    
+    folder.lock()
     try:
-        response['date'] = str(time.strftime("%d-%m-%Y %H:%m", email.utils.parsedate(email_message['Date'])))
-        attDate = str(time.strftime("%Y/%m/", email.utils.parsedate(email_message['Date'])))
-    except TypeError:
-        response['date'] = "Error in Date"
-        attDate = str("2000/1/")
+        message_key = folder.add(msg)
+        folder.flush()
 
-    response['date2'] = email.utils.parsedate(email_message['Date'])
+        maildir_message = folder.get_message(message_key)
+        message_date_epoch = time.mktime(parsedate(decode_header(maildir_message.get("Date"))[0][0]))
+        maildir_message.set_date(message_date_epoch)
+        maildir_message.add_flag("s")
 
-    contentOfMail = {}
-    contentOfMail['text'] = ""
-    contentOfMail['html'] = ""
 
-    att_dir = os.path.join(mailFolder, attDate, str(message_id))
-    if not os.path.exists(att_dir):
-        os.makedirs(str(att_dir))
-        # print("Creating directory %s for attachments.") % (att_dir)
-    with open(att_dir + "/index.html", "w") as fpIndex:
-        fpIndex.write("<html>\n<head>\n<title>Attachments for email " + str(message_id) + "</title>\n</head>\n<body>\n")
-        fpIndex.write("<h1>Attachments for email " + str(message_id) + "</h1>\n")
-        fpIndex.write("<ul>\n")
-        fpIndex.close()
+    finally:
+        folder.unlock()
+        folder.close()
+        mbox.close()
 
-    for part in email_message.walk():
-        cType = part.get_content_type()
-        charset = part.get_charsets()
-        if cType == 'text/plain':
-            decoded_contents = part.get_payload(decode=True)
-            try:
-                if charset[0]:
-                    contentOfMail['text'] += cgi.escape(unicode(str(decoded_contents), charset[0])).encode('ascii', 'xmlcharrefreplace')
-                else:
-                    contentOfMail['text'] += cgi.escape(str(decoded_contents)).encode('ascii', 'xmlcharrefreplace')
-            except Exception:
-                try:
-                    contentOfMail['text'] +=  decode_string(decoded_contents)
-                except DecodeError:
-                    contentOfMail['text'] += "Error decoding mail contents."
-                    print("Error decoding mail contents")
-            continue
-        elif cType == 'text/html':
-            decoded_contents = part.get_payload(decode=True)
-            try:
-                if charset[0]:
-                    contentOfMail['html'] += unicode(str(decoded_contents), charset[0]).encode('ascii', 'xmlcharrefreplace')
-                else:
-                    contentOfMail['html'] += str(decoded_contents).encode('ascii', 'xmlcharrefreplace')
-            except Exception:
-                try:
-                    contentOfMail['html'] += decode_string(decoded_contents)
-                except DecodeError:
-                    contentOfMail['html'] += "Error decoding mail contents."
-                    print("Error decoding mail contents")
+def saveMostRecentMailID(mail_id, email_address, folder, filename = "nopriv.txt"):
+    match = False
+    for line in fileinput.input(filename, inplace = 1): 
+        if line.split(":")[0] == folder and line.split(":")[1] == email_address and len(line) > 3:
+            line = folder + ":" + email_address + ":" + str(mail_id)
+            match = True
+        if len(line) > 3 and line != "\n":
+            print(line)
+    fileinput.close()
+    if match == False:
+        with open(os.path.join(filename), 'a') as progress_file:
+            progress_file.write(folder + ":" + email_address + ":" + str(mail_id))
+            progress_file.close()    
 
-            continue
-        if part.get_content_maintype() == 'multipart':
-            continue
-        if part.get('Content-Disposition') == None:
-            continue
-        try:
-            decoded_filename = u"".join(part.get_filename())
-        except TypeError as error:
-            decoded_filename = u"".join("Error_in_parsing_filename")
-        attFileName = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", decoded_filename.replace(":", "").replace("/", "").replace("\\", ""))
 
-        if lastAttName == attFileName:
-            attFileName = str(attCount) + "." + attFileName
+
+def getLastMailID(folder, email_address, filename = "nopriv.txt"):
+    if not os.path.exists(filename):
+        with open(os.path.join(filename), 'w') as progress_file:
+            progress_file.write(folder + ":" + email_address + ":1")
+            progress_file.close()
+    match = False
+    with open(os.path.join(filename), 'r') as progress_file:
+        for line in progress_file:
+            if len(line) > 3:
+                latest_mailid = line.split(":")[2]
+                email_addres_from_file = line.split(":")[1]
+                folder_name = line.split(":")[0]
+                if folder_name == folder and email_addres_from_file == email_address:
+                    progress_file.close()
+                    return latest_mailid
+        return 0
+        progress_file.close()
+
+
+def get_messages_to_local_maildir(mailFolder, mail, startid = 1):
+    global IMAPLOGIN
+    mail.select(mailFolder, readonly=True)
+    try:
+        typ, mdata = mail.search(None, "ALL")
+    except Exception as imaperror:
+        print("Error in IMAP Query: %s." % imaperror)
+        print("Does the imap folder \"%s\" exists?" % mailFolder)
+        exit()
+
+    total_messages_in_mailbox = len(mdata[0].split())
+    last_mail_id = mdata[0].split()[-1]
+    folder_most_recent_id = getLastMailID(mailFolder, IMAPLOGIN)
+
+    if folder_most_recent_id > 2 and incremental_backup == True:
+        if not int(folder_most_recent_id) == 1:
+            startid = int(folder_most_recent_id) + 1
+    if startid == 0:
+        startid = 1
+
+    for message_id in range(int(startid), int(total_messages_in_mailbox + 1)):
+        result, data = mail.fetch(message_id , "(RFC822)")
+        #result, data = mail.fetch(message_id , "(BODY.PEEK[HEADER])")
+        raw_email = data[0][1]
+        print('Saving message %s' % (message_id))
+        maildir_folder = mailFolder.replace("/", ".")
+        saveToMaildir(raw_email, maildir_folder)
+        if incremental_backup == True:
+            saveMostRecentMailID(message_id, IMAPLOGIN, mailFolder)
         
-        lastAttName = attFileName
-        attCount += 1
-            
 
-        att_path = os.path.join(mailFolder, attDate, str(message_id), attFileName)
-        att_locs = []
-        fp = open(att_path, 'wb')
-        try:
-            fp.write(part.get_payload(decode=True))
-            # print("Saved attachment \"%s\".") % attFileName
-        except Exception as e:
-            fp.write("Error writing attachment: " + str(e) + ".\n")
-            print("Error writing attachment: " + str(e) + ".\n")
-        with open(att_dir + "/index.html", "a") as fpIndex:
-            fpIndex.write("<li><a href=\"" + str(attFileName) + "\">" + str(attFileName) + "</a></li>\n")
-            fpIndex.close()
-            fp.close()
-
-        response['attachment'] = True
-
-
-    response['content'] = contentOfMail
-    response['message_id'] = message_id
-
-
-    return response
 
 def returnIndexPage():
     global IMAPFOLDER
@@ -326,7 +273,6 @@ def returnIndexPage():
         indexFile.close()
 
 def returnImapFolders(available=True, selected=True, html=False):
-    global mail
     response = ""
     if available:
         if not html:
@@ -398,7 +344,14 @@ def copy(src, dst):
             print("File %s already exists." % src)
         else: raise
 
+def move(src, dst):
+        shutil.move(src, dst)
 
+def moveMailDir(maildir):
+    print("Adding timestamp to Maildir.")
+    now = datetime.datetime.now()
+    maildirfilename = "Maildir." + str(now).replace("/", ".").replace(" ", ".").replace("-", ".").replace(":", ".")
+    move(maildir, maildirfilename)
 
 def returnWelcome():
     print("##############################################")
@@ -412,200 +365,412 @@ def returnWelcome():
     print(printQuote())
     print("")
 
-def backup(mailFolder):
-    mail.select(mailFolder)
+
+def createOverviewPage(folder, pagenumber, amountOfItems = 50):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    overview_page_name = "email-report-" + str(pagenumber) + ".html"
+    overview_file_path = os.path.join(folder, overview_page_name)
+    with open(overview_file_path, "w") as overview_file:
+        overview_file.write(returnHeader("Email Report " + str(pagenumber)))
+        overview_file.write(returnMenu(folder))
+        overview_file.write("<table class=\"striped\">\n\t ")
+        overview_file.close()
+
+
+
+def addMailToOverviewPage(folder, pagenumber, mail_id, mail_from, 
+                          mail_to,  mail_subject, mail_date, 
+                          mail_from_encoding = "utf-8", mail_to_encoding = "utf-8",
+                          mail_subject_encoding = "utf-8", 
+                          attachment = False):
+    mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
+    mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
+    mail_from = cgi.escape(unicode(mail_from, mail_from_encoding)).encode('ascii', 'xmlcharrefreplace')
+
     try:
-        result, data = mail.search(None, "ALL")
-    except Exception as imaperror:
-        print("Error in IMAP Query: %s." % imaperror)
-        print("Does the imap folder \"%s\" exists?" % mailFolder)
-        exit()
-    ids = data[0]
-    id_list = ids.split()
-    breakOut = False
+        email_date = str(time.strftime("%d-%m-%Y %H:%m", email.utils.parsedate(mail_date)))
+        attachment_folder_date = str(time.strftime("%Y/%m/", email.utils.parsedate(mail_date)))
+    except TypeError:
+        email_date = "Error in Date"
+        attachment_folder_date = str("2000/1/")
 
+    email_file_path = os.path.join(attachment_folder_date, str(mail_id), "index.html")
 
-    indexCounter = 0
-    fileCounter = 1
-    for y in range(indexCounter, len(id_list)):
-        if len(id_list) < 50:
-            lastnum = int(id_list[-1])
-            firstnum = int(id_list[-1]) - (len(id_list) - 1)
+    overview_page_name = "email-report-" + str(pagenumber) + ".html"
+    overview_file_path = os.path.join(folder, overview_page_name)
+    with open(overview_file_path, "a") as overview_file:
+        overview_file.write("<tr>\n\t\t<td>")
+        overview_file.write(str(mail_id))
+        overview_file.write("</td>\n\t\t<td>")
+        overview_file.write(mail_from.decode('string-escape'))
+        overview_file.write("</td>\n\t\t<td>")
+        overview_file.write(mail_to)
+        overview_file.write("</td>\n\t\t<td>")
+        overview_file.write("<a href=\"" + email_file_path + "\">")
+        overview_file.write(mail_subject)
+        overview_file.write("</a>")
+        overview_file.write("</td>\n\t\t<td>")
+        overview_file.write(str(mail_date))
+        overview_file.write("</td>\n\t</tr>\n\t")
+        overview_file.close()
+
+def finishOverviewPage(folder, pagenumber, previouspage, nextpage, total_messages_in_folder):
+    overview_page_name = "email-report-" + str(pagenumber) + ".html"
+    overview_file_path = os.path.join(folder, overview_page_name)
+    with open(overview_file_path, "a") as overview_file:
+        overview_file.write("<tr>\n")
+        overview_file.write("\t\t<td colspan=\"5\">")
+        overview_file.write("<hr class=\"alt1\" />")
+        overview_file.write("</td>\n")
+        overview_file.write("\t</tr>\n")
+        overview_file.write("\t<tr>\n")
+        overview_file.write("\t\t<td colspan=\"2\">")
+        if previouspage:
+            overview_file.write("<a href = \"email-report-" + str(previouspage) + ".html\">Previous page (#" + str(previouspage) + ")</a>")
         else:
-            lastnum = int(id_list[-1])
-            firstnum = int(id_list[-1]) - 50
-        reportFileName = "email-report-" + str(fileCounter) + ".html"
-        reportFileName = os.path.join(mailFolder, reportFileName)
-        if breakOut is True:
-            indexCounter += 1
-            counter += 1
-            breakOut = False
-            break
-        with open(reportFileName, "w") as emailReportFile:
-            emailReportFile.write(returnHeader("Email Report " + str(fileCounter)))
-            emailReportFile.write(returnMenu(mailFolder))
-            counter = 1
-            maxItems = 50
-            maxList = (len(id_list) - 50)
-            if indexCounter >= maxList:
-                maxItems = len(id_list) - indexCounter
-            if indexCounter == len(id_list):
-                break
-            for z in range(int(indexCounter), int(indexCounter + maxItems)):
-                x = (int(len(id_list)) - int(indexCounter))
+            overview_file.write("No previous page.")
+        overview_file.write("</td>\n")
+
+        overview_file.write("\t\t<td colspan=\"1\">")
+        overview_file.write("Total items in folder: " + str(total_messages_in_folder))
+        overview_file.write("</td>\n")
+
+        overview_file.write("\t\t<td colspan=\"2\">")
+
+        if nextpage:
+            overview_file.write("<a href = \"email-report-" + str(nextpage) + ".html\">Next page (#" + str(nextpage) + ")</a>")
+        else:
+            overview_file.write("No more pages.")
+        overview_file.write("</td>\n")
+
+        overview_file.write("\t</tr>")
+        overview_file.write("\n</table>\n")
+        overview_file.write(returnFooter())
+        overview_file.close()
+
+
+
+def createMailPage(folder, mail_id, mail_for_page, current_page_number,
+                       mail_from, mail_to, mail_subject, mail_date,
+                       mail_has_attachment = False,
+                       mail_from_encoding = "utf-8", 
+                       mail_to_encoding = "utf-8",
+                       mail_subject_encoding = "utf-8"):
+
+    mail = mail_for_page
+    mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
+    mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
+    mail_from = cgi.escape(unicode(mail_from, mail_from_encoding)).encode('ascii', 'xmlcharrefreplace')
+    mail_number = int(mail_id)
+
+    print(("Processing mail %s from %s with subject %s.") % ( mail_id, mail_from, mail_subject))
+
+    try:
+        email_date = str(time.strftime("%d-%m-%Y %H:%m", email.utils.parsedate(mail_date)))
+        attachment_folder_date = str(time.strftime("%Y/%m/", email.utils.parsedate(mail_date)))
+    except TypeError:
+        email_date = "Error in Date"
+        attachment_folder_date = str("2000/1/")
+
+    content_of_mail = {}
+    content_of_mail['text'] = ""
+    content_of_mail['html'] = ""
+
+    for part in mail.walk():
+        part_content_type = part.get_content_type()
+        part_charset = part.get_charsets()
+        if part_content_type == 'text/plain':
+            part_decoded_contents = part.get_payload(decode=True)
+            try:
+                if part_charset[0]:
+                    content_of_mail['text'] += cgi.escape(unicode(str(part_decoded_contents), part_charset[0])).encode('ascii', 'xmlcharrefreplace')
+                else:
+                    content_of_mail['text'] += cgi.escape(str(part_decoded_contents)).encode('ascii', 'xmlcharrefreplace')
+            except Exception:
                 try:
-                    tableitem = return_message(mail, mailFolder, id_list, x)
-                except AttributeError as a:
-                    print("Error in Message %s: %s") % (z, a)
-                    breakOut = True
-                    indexCounter += 1
-                    counter += 1
-                if breakOut == True:
-                    break
+                    content_of_mail['text'] +=  decode_string(part_decoded_contents)
+                except DecodeError:
+                    content_of_mail['text'] += "Error decoding mail contents."
+                    print("Error decoding mail contents")
+            continue
+        elif part_content_type == 'text/html':
+            part_decoded_contents = part.get_payload(decode=True)
+            try:
+                if part_charset[0]:
+                    content_of_mail['html'] += unicode(str(part_decoded_contents), part_charset[0]).encode('ascii', 'xmlcharrefreplace')
+                else:
+                    content_of_mail['html'] += str(part_decoded_contents).encode('ascii', 'xmlcharrefreplace')
+            except Exception:
                 try:
-                    yeardir = str(tableitem['date2'][0])
-                except TypeError:
-                    yeardir = "unknown"
-                try:
-                    monthdir = str(tableitem['date2'][1])
-                    if len(monthdir) == 1:
-                        monthdir = str(0) + monthdir
-                except TypeError:
-                    monthdir = "01"
-                itemname = str(tableitem['message_id']) + ".html"
-                emailLink = yeardir + '/' + monthdir + '/' + itemname
-                print("Processing email %s from %s with subject: %s.\n") % (str(indexCounter), str(tableitem['termfrom']), str(tableitem['termsubject']))
+                    content_of_mail['html'] += decode_string(part_decoded_contents)
+                except DecodeError:
+                    content_of_mail['html'] += "Error decoding mail contents."
+                    print("Error decoding mail contents")
 
-                htmlSubject = cgi.escape(unicode(tableitem['subject'], 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-                htmlFrom = cgi.escape(unicode(tableitem['from'], 'utf-8')).encode('ascii', 'xmlcharrefreplace')
-                emailReportFile.write("<tr>\n")
-                emailReportFile.write("<td>\n")
-                emailReportFile.write(str(indexCounter + 1))
-                emailReportFile.write("</td>\n")
-                emailReportFile.write("<td width=\"20%\">\n")
-                emailReportFile.write(str(tableitem['from']))
-                emailReportFile.write("</td>\n")
-                emailReportFile.write("<td width=\"20%\">\n")
-                emailReportFile.write(str(tableitem['to']))
-                emailReportFile.write("</td>\n")
-                emailReportFile.write("<td width=\"40%\">\n")
-                emailReportFile.write("<a href=\"" + emailLink + "\">")
-                emailReportFile.write(str(tableitem['subject']))
-                emailReportFile.write("</a>\n")
-                emailReportFile.write("</td>\n")
-                emailReportFile.write("<td width=\"20%\">")
-                emailReportFile.write(str(tableitem['date']))
-                emailReportFile.write("</td>\n")
-                emailReportFile.write("</tr>\n")
+            continue
 
+    has_attachments = mail_has_attachment
+    folder_path_1 = os.path.join(folder, attachment_folder_date, str(mail_number))
 
-                if not os.path.exists(os.path.join(mailFolder, str(yeardir))):
-                    os.makedirs(os.path.join(mailFolder, str(yeardir)))
+    mail_html_page = os.path.join(folder_path_1, "index.html")
+    with open(mail_html_page, 'w') as mail_page:
+        mail_page.write(returnHeader(mail_subject + " - NoPriv.py vy Raymii.org", "../../../inc/", 2))
+        mail_page.write(returnMenu(folder_path_1))
+        mail_page.write("<table>\n")
+        mail_page.write("\t<tr>\n")
+        mail_page.write("\t\t<td width = \"20%\">From: </td>\n")
+        mail_page.write("\t\t<td width = \"80%\">" + mail_from + "</td>\n")
+        mail_page.write("\t<tr>\n")
 
-                if not os.path.exists(os.path.join(mailFolder, str(yeardir), str(monthdir))):
-                    os.makedirs(os.path.join(mailFolder, str(yeardir), str(monthdir)))
+        mail_page.write("\t<tr>\n")
+        mail_page.write("\t\t<td width = \"20%\">To: </td>\n")
+        mail_page.write("\t\t<td width = \"80%\">" + mail_to + "</td>\n")
+        mail_page.write("\t<tr>\n")
 
-                itemPath = os.path.join(mailFolder, str(yeardir), str(monthdir), str(itemname))
-                with open(itemPath, "w") as emailFile:
-                    emailFile.write(returnHeader("Email " + str(tableitem['subject']), "../../inc", 2))
-                    emailFile.write(returnMenu(mailFolder, inDate = True))
-                    emailFile.write("<strong>From:</strong> \"" + str(tableitem['from']) + "\"\n")
-                    emailFile.write("<br />\n")
-                    emailFile.write("<strong>To: </strong>\"" + str(tableitem['to']) + "\"\n")
-                    emailFile.write("<br />\n")
-                    emailFile.write("<strong>Subject:</strong> \"" + str(tableitem['subject']) + "\"\n")
-                    emailFile.write("<br />\n")
-                    emailFile.write("<strong>Folder:</strong> \"" + str(mailFolder) + "\"\n")
-                    emailFile.write("<br />\n")
-                    emailFile.write("<strong>Date:</strong> \"" + str(tableitem['date']) + "\"\n")
-                    try:
-                        if tableitem['attachment'] is True:
-                            emailFile.write("<br />\n")
-                            emailFile.write("<a href=\"" + str(tableitem['message_id']) + "/index.html\">")
-                            emailFile.write("Click here to see the attachments of this email.")
-                            emailFile.write("</a>\n")
-                            attFolder = os.path.join(mailFolder, str(yeardir), str(monthdir), str(tableitem['message_id']))
-                            attFilePath = os.path.join(mailFolder, str(yeardir), str(monthdir), str(tableitem['message_id']), "index.html")
-                            if not os.path.exists(attFolder):
-                                os.makedirs(attFolder)
-                                print("Creating attachment folder %s from outer loop.") % attFolder
-                            try:
-                                with open(attFilePath, 'a') as fp:
-                                    fp.write("</ul>\n<br />\n")
-                                    fp.write(returnFooter())
-                                    fp.close()
-                            except IOError as e:
-                                print("IOError in writing attachment: "), str(e)
-                    except IndexError:
-                        emailFile.write("<br />\n")
-                        emailFile.write("This email has no attachments.")
+        mail_page.write("\t<tr>\n")
+        mail_page.write("\t\t<td width = \"20%\">Subject: </td>\n")
+        mail_page.write("\t\t<td width = \"80%\">" + mail_subject + "</td>\n")
+        mail_page.write("\t<tr>\n")
 
-                    emailFile.write("<br />\n")
+        if has_attachments:
+            mail_page.write("\t<tr>\n")
+            mail_page.write("\t\t<td colspan = \"2\"><a href=\"attachments\">Click here to open the attachments.</a> </td>\n")
+            mail_page.write("\t<tr>\n")
+        mail_page.write("\t<tr><td><br /></td>\n\t\t<td><a href=\"javascript:history.go(-1)\">Go back</a></td>\n\t</tr>\n")
 
-                    emailFile.write("<hr />\n")
-                    if tableitem['content']['text']:
-                        emailFile.write("<!-- Email Content (text) -->\n")
-                        emailFile.write("<table>\n<tr>\n")
-                        emailFile.write("<td width=\"100%\">\n<pre id=\"nonhtml\">\n")
-                        emailFile.write(decodestring(str(tableitem['content']['text'])))
-                        emailFile.write("</pre>\n</td>\n</tr>\n</table>\n")
-                    emailFile.write("<hr />\n")
-                    if tableitem['content']['html']:
-                        emailFile.write("<!-- Email Content (HTML) -->\n")
-                        emailFile.write("<table style=\"{text-align:left;}\">\n<tr>\n<td width=\"100%\" id=\"withhtml\">\n")
-                        removedHeader = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", str(tableitem['content']['html']), flags=re.DOTALL)
-                        removedHeader = re.sub(r"(?i)</body>.*?</html>", "", removedHeader, flags=re.DOTALL)
-                        removedHeader = re.sub(r"(?i)<!DOCTYPE.*?>", "", removedHeader, flags=re.DOTALL)
-                        removedHeader = re.sub(r"(?i)POSITION: absolute;", "", removedHeader, flags=re.DOTALL)
-                        removedHeader = re.sub(r"(?i)TOP: .*?;", "", removedHeader, flags=re.DOTALL)
-                        emailFile.write(decodestring(removedHeader.replace("<html>", "")))
-                        emailFile.write("</td>\n</tr>\n</table>\n")
-                    emailFile.write("<a href=\"javascript:history.go(-1)\">Go back</a>\n")
-                    emailFile.write(returnFooter())
-                    emailFile.close()
-                indexCounter += 1
-                counter += 1
-            print("Finishing index file %s") % reportFileName
-            emailReportFile.write("<tr>\n<td colspan=\"6\"><center> \n<br />\n&nbsp;<br /> \n<br /></center>\n</td>\n</tr>\n")
-            emailReportFile.write("<tr>\n<td colspan=\"6\">Total items in folder <strong>%s</strong>: %s .</td>\n</tr>\n" % (mailFolder, str(len(id_list))))
-            if fileCounter == 1 and len(id_list) > 50:
-                nextLink = "email-report-2.html"
-                endingString = "<tr>\n<td colspan=\"2\">Page 1</td>\n<td colspan=\"3\"><a href=\"%s\">Next page.</a></td>\n</tr>\n" % nextLink
-                emailReportFile.write(endingString)
+        if content_of_mail['text']:
+            mail_page.write("\t<tr>\n")
+            mail_page.write("\t\t<td colspan = \"2\"><pre>")
+            strip_header = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", content_of_mail['text'], flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)</body>.*?</html>", "", strip_header, flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)<!DOCTYPE.*?>", "", strip_header, flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)POSITION: absolute;", "", strip_header, flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)TOP: .*?;", "", strip_header, flags=re.DOTALL)
+            mail_page.write(decodestring(strip_header))
+            mail_page.write("</pre></td>\n")
+            mail_page.write("\t<tr>\n")
+            
 
-            elif fileCounter == 1 and len(id_list) <= 50:
-                endingString = "<tr>\n<td colspan=\"2\">Page 1</td>\n<td colspan=\"3\">No more pages.</td>\n</tr>"
-                emailReportFile.write(endingString)
-            elif fileCounter == (len(id_list) / 50):
-                prevLink = "email-report-" + str(fileCounter - 1) + ".html"
-                endingString = "<tr>\n<td colspan=\"2\">Page %s.</td>\n<td colspan=\"3\">\n<a href=\"%s\">Previous page.</a>\n</td>\n</tr>" % (str(fileCounter), prevLink)
-                emailReportFile.write(endingString)
+        if content_of_mail['html']:
+            mail_page.write("\t<tr>\n")
+            mail_page.write("\t\t<td colspan = \"2\">")
+            strip_header = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", content_of_mail['html'], flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)</body>.*?</html>", "", strip_header, flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)<!DOCTYPE.*?>", "", strip_header, flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)POSITION: absolute;", "", strip_header, flags=re.DOTALL)
+            strip_header = re.sub(r"(?i)TOP: .*?;", "", strip_header, flags=re.DOTALL)
+            mail_page.write(decodestring(strip_header))
+            mail_page.write("</td>\n")
+            mail_page.write("\t<tr>\n")
+        
+        mail_page.write("\t<tr><td><br /></td>\n\t\t<td><a href=\"javascript:history.go(-1)\">Go back</a></td>\n\t</tr>\n")
 
-            else:
-                prevLink = "email-report-" + str(fileCounter - 1) + ".html"
-                nextLink = "email-report-" + str(fileCounter + 1) + ".html"
-                pageNumber = str(fileCounter)
-                endingString = "<tr>\n<td colspan=\"2\">Page %s.</td><td colspan=\"2\"><a href=\"%s\">Previous page.</a>\n</td>\n" % (pageNumber, prevLink)
-                endingString2 = "<td colspan=\"2\"><a href=\"%s\">Next page.</a>\n</td>\n</tr>" % nextLink
-                emailReportFile.write(endingString)
-                emailReportFile.write(endingString2)
+        mail_page.close()
 
-            emailReportFile.write("    </tbody>\n")
-            emailReportFile.write("</table>\n")
-            emailReportFile.write(returnFooter())
-            emailReportFile.close()
-            fileCounter += 1
+def save_mail_attachments_to_folders(mail_id, mail, local_folder):
+
+    global att_count
+    global last_att_filename
+    returnTrue = False
+
+    try:
+        att_date = str(time.strftime("%Y/%m/", email.utils.parsedate(mail['Date'])))
+    except TypeError:
+        att_date = str("2000/1/")
+
+    if not os.path.exists(os.path.join(folder, att_date, str(mail_id), "attachments/")):
+        os.makedirs(os.path.join(folder, att_date, str(mail_id), "attachments/"))
+ 
+    with open(os.path.join(folder, att_date, str(mail_id), "attachments/index.html"), "w") as att_index_file:
+        att_index_file.write(returnHeader("Attachments for mail: " + str(mail_id) + ".", "../../../../inc", 2))
+        att_index_file.write(returnMenu("../../../../"))
+        att_index_file.write("<h1>Attachments for mail: " + str(mail_id) + "</h1>\n")
+        att_index_file.write("<ul>\n")
+        att_index_file.close()
+
+    for part in mail.walk():
+        if part.get_content_maintype() == 'multipart':
+            continue
+        if part.get('Content-Disposition') == None:
+            continue
+        decoded_filename = part.get_filename()
+        filename_header = None
+        try:
+            filename_header = decode_header(part.get_filename())
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            filename_header = None
+
+        if filename_header:
+            filename_header = filename_header[0][0]
+            att_filename = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", filename_header.replace(":", "").replace("/", "").replace("\\", ""))
+        else:
+            att_filename = re.sub(r'[^.a-zA-Z0-9 :;,\.\?]', "_", decoded_filename.replace(":", "").replace("/", "").replace("\\", ""))
+
+        if last_att_filename == att_filename:
+            att_filename = str(att_count) + "." + att_filename
+        
+        last_att_filename = att_filename
+        att_count += 1
+            
+
+        att_path = os.path.join(folder, att_date, str(mail_id), "attachments", att_filename)
+        att_dir = os.path.join(folder, att_date, str(mail_id), "attachments")
+
+        att_locs = []
+        with open(att_path, 'wb') as att_file:
+            try:
+                att_file.write(part.get_payload(decode=True))
+            except Exception as e:
+                att_file.write("Error writing attachment: " + str(e) + ".\n")
+                print("Error writing attachment: " + str(e) + ".\n")
+                return False
+            att_file.close()
+
+        with open(att_dir + "/index.html", "a") as att_dir_index:
+            att_dir_index.write("<li><a href=\"" + str(att_filename) + "\">" + str(att_filename) + "</a></li>\n")
+            att_dir_index.close()
+            returnTrue = True
+    
+    with open(os.path.join(folder, att_date, str(mail_id), "attachments/index.html"), "a") as att_index_file:
+        att_index_file.write("</ul>")
+        att_index_file.write(returnFooter())
+        att_index_file.close()
+        if returnTrue:
+            return True
+        else:
+            return False          
+
+def extract_date(email):
+    date = email.get('Date')
+    return parsedate(date)
+
+def return_sorted_email_list(maildir):
+    sorted_mails = sorted(maildir, key=extract_date)
+    sorted_mail_list = {}
+    number = 0
+    for mail in sorted_mails:
+        sorted_mail_list[number] = mail
+        number += 1
+
+    return sorted_mail_list
+    
+
+def backup_mails_to_html_from_local_maildir(folder):
+    global maildir
+    global messages_per_overview_page
+    ## Maildir folders have dots, not slashes
+    local_maildir_folder = folder.replace("/", ".")
+    local_maildir = mailbox.Maildir(os.path.join(maildir), factory=None, create=True)
+    maildir_folder = local_maildir.get_folder(local_maildir_folder)
+
+    ## Start with the first email
+    mail_number = 1
+    total_messages_in_folder = maildir_folder.__len__()
+    try:
+        number_of_overview_pages = float(total_messages_in_folder) / float(messages_per_overview_page)
+        number_of_overview_pages = int(ceil(number_of_overview_pages))
+    except Exception as error:
+        print(error)
+        raise
+    
+    sorted_maildir = return_sorted_email_list(maildir_folder)
+    # We go through the mailbox in reverse
+    start_mail_number = total_messages_in_folder
+
+    ## Create the overview pages
+    for number in reversed(range(number_of_overview_pages)):
+        number += 1
+        createOverviewPage(folder, number, messages_per_overview_page)
+        
+    current_page_number = 1
+
+    ## Add the mail subject, from, to and date to the overview page
+    run = 1
+    for number in reversed(range(start_mail_number)):
+        if (current_page_number * messages_per_overview_page) == mail_number:
+            #if not current_page_number == 1:
+            current_page_number += 1
+        if not run == 1:
+            mail_number += 1
+        run += 1
+        #key = maildir_folder.keys()[number]
+
+        mail = sorted_maildir[number]
+        mail_for_page = sorted_maildir[number]
+        mail_subject = decode_header(mail.get('Subject'))[0][0]
+        mail_subject_encoding = decode_header(mail.get('Subject'))[0][1]
+        if not mail_subject_encoding:
+            mail_subject_encoding = "utf-8"
+
+        if not mail_subject:
+            mail_subject = "(No Subject)"
+
+        mail_from = email.utils.parseaddr(mail.get('From'))[1]
+
+        mail_from_encoding = decode_header(mail.get('From'))[0][1]
+        if not mail_from_encoding:
+            mail_from_encoding = "utf-8"
+
+        mail_to = email.utils.parseaddr(mail.get('To'))[1]
+        mail_to_encoding = decode_header(mail.get('To'))[0][1]
+        if not mail_to_encoding:
+            mail_to_encoding = "utf-8"
+
+        mail_date = decode_header(mail.get('Date'))[0][0]
+        
+        addMailToOverviewPage(folder, current_page_number, mail_number, 
+                              mail_from, mail_to, mail_subject, mail_date, 
+                              mail_from_encoding = mail_from_encoding, 
+                              mail_to_encoding = mail_to_encoding,
+                              mail_subject_encoding = mail_subject_encoding,
+                            )  
+
+        mail_has_attachment = save_mail_attachments_to_folders(mail_number, mail_for_page, folder)
+
+        createMailPage(folder, mail_number, mail_for_page, current_page_number,
+                       mail_from, mail_to, mail_subject, mail_date, 
+                       mail_has_attachment,
+                       mail_from_encoding = mail_from_encoding, 
+                       mail_to_encoding = mail_to_encoding,
+                       mail_subject_encoding = mail_subject_encoding)
+  
+
+    ## Finish the overview page
+    for number in reversed(range(number_of_overview_pages)):
+        number += 1
+        if number == 1 and number_of_overview_pages == 1:
+            finishOverviewPage(folder, number, 0, 0, total_messages_in_folder)
+        elif number == 1:
+            finishOverviewPage(folder, number, 0, (number + 1), total_messages_in_folder)
+        elif number == number_of_overview_pages:
+            finishOverviewPage(folder, number, (number - 1), 0, total_messages_in_folder)
+        else:
+            finishOverviewPage(folder, number, (number - 1), (number + 1), total_messages_in_folder)    
+
 
 
 
 returnWelcome()
-print returnImapFolders()
+
+mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
+print(returnImapFolders())
 
 returnIndexPage()
 
-for folder in IMAPFOLDER:
-    print(("Starting on folder: %s.") % folder)
-    copy("inc", folder + "/inc/")
-    backup(folder)
+for folder in IMAPFOLDER:    
+    print(("Getting messages from server from folder: %s.") % folder)
+    get_messages_to_local_maildir(folder, mail)    
     print(("Done with folder: %s.") % folder)
     print("\n")
+
+
+for folder in IMAPFOLDER:
+    print(("Processing folder: %s.") % folder)
+    copy("inc", folder + "/inc/")
+    backup_mails_to_html_from_local_maildir(folder)
+    print(("Done with folder: %s.") % folder)
+    print("\n")    
+        
+if not incremental_backup:
+    moveMailDir(maildir)

@@ -33,6 +33,7 @@ import errno
 import datetime
 import fileinput
 from quopri import decodestring
+from BeautifulSoup import BeautifulSoup
 
 ###########################
 # Do not edit above here  #
@@ -44,7 +45,7 @@ IMAPPASSWORD = ""
 IMAPFOLDER = ["", "", ""]
 
 ssl = True
-incremental_backup = False
+incremental_backup = True
 
 ###########################
 # Do not edit below here  #
@@ -156,7 +157,10 @@ def saveToMaildir(msg, mailFolder):
         folder.flush()
 
         maildir_message = folder.get_message(message_key)
-        message_date_epoch = time.mktime(parsedate(decode_header(maildir_message.get("Date"))[0][0]))
+        try:
+            message_date_epoch = time.mktime(parsedate(decode_header(maildir_message.get("Date"))[0][0]))
+        except TypeError as typeerror:
+            message_date_epoch = time.mktime(2000, 1, 1, 1, 1, 1, 1, 1, 0)
         maildir_message.set_date(message_date_epoch)
         maildir_message.add_flag("s")
 
@@ -223,9 +227,8 @@ def get_messages_to_local_maildir(mailFolder, mail, startid = 1):
 
     for message_id in range(int(startid), int(total_messages_in_mailbox + 1)):
         result, data = mail.fetch(message_id , "(RFC822)")
-        #result, data = mail.fetch(message_id , "(BODY.PEEK[HEADER])")
         raw_email = data[0][1]
-        print('Saving message %s' % (message_id))
+        print('Saving message %s.' % (message_id))
         maildir_folder = mailFolder.replace("/", ".")
         saveToMaildir(raw_email, maildir_folder)
         if incremental_backup == True:
@@ -510,6 +513,8 @@ def createMailPage(folder, mail_id, mail_for_page, current_page_number,
 
             continue
 
+
+
     has_attachments = mail_has_attachment
     folder_path_1 = os.path.join(folder, attachment_folder_date, str(mail_number))
 
@@ -566,7 +571,7 @@ def createMailPage(folder, mail_id, mail_for_page, current_page_number,
         
         mail_page.write("\t<tr><td><br /></td>\n\t\t<td><a href=\"javascript:history.go(-1)\">Go back</a></td>\n\t</tr>\n")
 
-        mail_page.close()
+        mail_page.close()        
 
 def save_mail_attachments_to_folders(mail_id, mail, local_folder):
 

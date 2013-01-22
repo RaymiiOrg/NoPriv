@@ -159,7 +159,7 @@ def saveToMaildir(msg, mailFolder):
         try:
             message_date_epoch = time.mktime(parsedate(decode_header(maildir_message.get("Date"))[0][0]))
         except TypeError as typeerror:
-            message_date_epoch = time.mktime(2000, 1, 1, 1, 1, 1, 1, 1, 0)
+            message_date_epoch = time.mktime([2000, 1, 1, 1, 1, 1, 1, 1, 0])
         maildir_message.set_date(message_date_epoch)
         maildir_message.add_flag("s")
 

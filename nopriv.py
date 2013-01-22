@@ -33,7 +33,6 @@ import errno
 import datetime
 import fileinput
 from quopri import decodestring
-from BeautifulSoup import BeautifulSoup
 
 ###########################
 # Do not edit above here  #

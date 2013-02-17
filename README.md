@@ -41,6 +41,10 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 
 ### Changelog
 
+New in version 3.1:
+
+- Added a sample `muttrc` file to view NoPriv with the Mutt mail client. 
+
 New in version 3:
 
 - Supports incremental backups
@@ -93,6 +97,15 @@ If you only have a console, it works just fine in Links2 (see above screenshot):
     
     links2 ./index.html
 
+#### Mutt
+
+A sample muttrc file is included since version 3.1. This file has the maildir set up and has the solarized dark colour scheme, because I like that.
+
+First, install mutt and browse to the nopriv folder, then open mutt with the muttrc file:
+
+    mutt -F muttrc
+
+You can now browse your email. Remember to select the right folder first by pressing the `c` in mutt.
 
 ### Requirements
 

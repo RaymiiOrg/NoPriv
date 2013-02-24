@@ -386,9 +386,14 @@ def addMailToOverviewPage(folder, pagenumber, mail_id, mail_from,
                           mail_from_encoding = "utf-8", mail_to_encoding = "utf-8",
                           mail_subject_encoding = "utf-8", 
                           attachment = False):
-    mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
-    mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
-    mail_from = cgi.escape(unicode(mail_from, mail_from_encoding)).encode('ascii', 'xmlcharrefreplace')
+    try:
+        mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
+        mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
+        mail_from = cgi.escape(unicode(mail_from, mail_from_encoding)).encode('ascii', 'xmlcharrefreplace')
+    except Exception:
+        mail_subject = decode_string(mail_subject)
+        mail_to = decode_string(mail_to)
+        mail_from = decode_string(mail_from)
 
     try:
         email_date = str(time.strftime("%d-%m-%Y %H:%m", email.utils.parsedate(mail_date)))
@@ -461,9 +466,16 @@ def createMailPage(folder, mail_id, mail_for_page, current_page_number,
                        mail_subject_encoding = "utf-8"):
 
     mail = mail_for_page
-    mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
-    mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
-    mail_from = cgi.escape(unicode(mail_from, mail_from_encoding)).encode('ascii', 'xmlcharrefreplace')
+
+    try:
+        mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
+        mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
+        mail_from = cgi.escape(unicode(mail_from, mail_from_encoding)).encode('ascii', 'xmlcharrefreplace')
+    except Exception:
+        mail_subject = decode_string(mail_subject)
+        mail_to = decode_string(mail_to)
+        mail_from = decode_string(mail_from)
+
     mail_number = int(mail_id)
 
     print(("Processing mail %s from %s with subject %s.") % ( mail_id, mail_from, mail_subject))

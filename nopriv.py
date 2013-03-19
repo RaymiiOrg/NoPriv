@@ -215,7 +215,11 @@ def get_messages_to_local_maildir(mailFolder, mail, startid = 1):
         exit()
 
     total_messages_in_mailbox = len(mdata[0].split())
-    last_mail_id = mdata[0].split()[-1]
+    last_mail_id = 0
+    try:
+        last_mail_id = mdata[0].split()[-1]
+    except Exception:
+        pass
     folder_most_recent_id = getLastMailID(mailFolder, IMAPLOGIN)
 
     if folder_most_recent_id > 2 and incremental_backup == True:

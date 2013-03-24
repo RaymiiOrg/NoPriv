@@ -83,7 +83,6 @@ try:
 except:
     pass
 
-print("-------------------------> %s" % incremental_backup)
 
 enable_html = True
 CreateMailDir = True

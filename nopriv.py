@@ -32,23 +32,58 @@ import shutil
 import errno
 import datetime
 import fileinput
+import ConfigParser
 from quopri import decodestring
 
-###########################
-# Do not edit above here  #
-###########################
+# places where the config could be located
+config_file_paths = [ 
+    './nopriv.ini',
+    './.nopriv.ini',
+    '~/.config/nopriv.ini',
+    '/opt/local/etc/nopriv.ini',
+    '/etc/nopriv.ini'
+]
 
-IMAPSERVER = ""
-IMAPLOGIN = ""
-IMAPPASSWORD = ""
-IMAPFOLDER = ["", "", ""]
+config = ConfigParser.RawConfigParser()
+found = False
+for conf_file in config_file_paths:
+    if os.path.isfile(conf_file):
+        config.read(conf_file)
+        found = True
+        break
+if found == False:
+    message = "No config file found. Expected places: %s" % \
+        ("\n".join(config_file_paths), )
+    raise Exception(message)
 
-ssl = True
-incremental_backup = True
 
-###########################
-# Do not edit below here  #
-###########################
+IMAPSERVER = config.get('nopriv', 'imap_server')
+IMAPLOGIN = config.get('nopriv', 'imap_user')
+IMAPPASSWORD = config.get('nopriv', 'imap_password')
+
+IMAPFOLDER = [ folder.strip() for folder in \
+                     config.get('nopriv', 'imap_folder').split(',') \
+                     if folder.strip() != "" ]
+
+yes_flags = ['true', 1, '1', 'True', 'yes', 'y', 'on']
+
+ssl = False
+try: 
+    ssl_value = config.get('nopriv', 'ssl')
+    if ssl_value in yes_flags: 
+        ssl = True
+except:
+    pass
+
+incremental_backup = False
+try:
+    incremental_value = config.get('nopriv', 'incremental_backup')
+    if incremental_value in yes_flags: 
+        incremental_backup = True
+except:
+    pass
+
+
 enable_html = True
 CreateMailDir = True
 messages_per_overview_page = 50

@@ -41,6 +41,10 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 
 ### Changelog
 
+New in version 4:
+
+- INI style config, either per user or system wide (thanks to [https://github.com/brejoc](Jochen Breuer))
+
 New in version 3.1:
 
 - Added a sample `muttrc` file to view NoPriv with the Mutt mail client. 
@@ -70,20 +74,30 @@ New in version 2:
 
 2. Set up your login details, imap server and ssl:
 
-Open `nopriv.py` in a text editor and edit the following variables (example filled in for gmail):
+Edit the `nopriv.ini` file with your IMAP server, login and password:
 
-    IMAPSERVER = "imap.gmail.com"
-    IMAPLOGIN = "janeway@gmail.com"
-    IMAPPASSWORD = "Voyager1"
-    IMAPFOLDER = ["[Gmail]/Sent Mail", "INBOX", "[Gmail]/Starred", "Captains_Log", "Important"]
-    ssl = True
-    incremental_backup = True
+    [nopriv]
+    imap_server = imap.gmail.com
+    imap_user = xyz@googlemail.com
+    imap_password = my_secrept_password
+    imap_folder = INBOX, Draft, Newletters
+    
+    #optional
+    ssl = true
+    incremental_backup = true
 
-(Mind the capital on ssl/incremental_backup, `True`/`False`, not `true`/`false`). 
+If you want to use SSL to connect to IMAP, or want to use incremental backups, enable or disable the options.
+
+
+`Nopriv.ini` can be in the following locations:
+ 
+- './nopriv.ini'
+- './.nopriv.ini'
+- '~/.config/nopriv.ini'
+- '/opt/local/etc/nopriv.ini'
+- '/etc/nopriv.ini'
 
 If you use gmail and want to backup all your email, use the "[Gmail]/All Mail" folder. It might be named different if you use another locale, for me with a Dutch gmail account it is named "[Gmail]/Alle Berichten".
-
-If you only want to backup one folder, use something like this: `IMAPFOLDER = ["Folder"]`. 
 
 3. Execute the script:
 

@@ -88,6 +88,7 @@ enable_html = True
 CreateMailDir = True
 messages_per_overview_page = 50
 
+inc_location = "inc"
 
 def connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD):
     if ssl is True:
@@ -99,7 +100,7 @@ def connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD):
 
 maildir = 'NoPrivMaildir'
 
-def returnHeader(title, inclocation="inc", layout=1):
+def returnHeader(title, inclocation=inc_location, layout=1):
     if layout is 1:
         response = """
 <html>
@@ -822,7 +823,7 @@ for folder in IMAPFOLDER:
 
 for folder in IMAPFOLDER:
     print(("Processing folder: %s.") % folder)
-    copy("inc", folder + "/inc/")
+    copy(inc_location, folder + "/inc/")
     backup_mails_to_html_from_local_maildir(folder)
     print(("Done with folder: %s.") % folder)
     print("\n")    

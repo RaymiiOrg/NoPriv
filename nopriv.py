@@ -62,8 +62,8 @@ IMAPSERVER = config.get('nopriv', 'imap_server')
 IMAPLOGIN = config.get('nopriv', 'imap_user')
 IMAPPASSWORD = config.get('nopriv', 'imap_password')
 
-if IMAPPASSWORD = "":
-    IMAPPASSWORD=getpass.getpass()
+if IMAPPASSWORD == "":
+    IMAPPASSWORD = getpass.getpass()
 
 IMAPFOLDER = [ folder.strip() for folder in \
                      config.get('nopriv', 'imap_folder').split(',') \

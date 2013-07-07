@@ -34,6 +34,7 @@ import datetime
 import fileinput
 import ConfigParser
 from quopri import decodestring
+import getpass
 
 # places where the config could be located
 config_file_paths = [ 
@@ -60,6 +61,9 @@ if found == False:
 IMAPSERVER = config.get('nopriv', 'imap_server')
 IMAPLOGIN = config.get('nopriv', 'imap_user')
 IMAPPASSWORD = config.get('nopriv', 'imap_password')
+
+if IMAPPASSWORD = "":
+    IMAPPASSWORD=getpass.getpass()
 
 IMAPFOLDER = [ folder.strip() for folder in \
                      config.get('nopriv', 'imap_folder').split(',') \

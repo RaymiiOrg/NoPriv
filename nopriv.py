@@ -820,7 +820,28 @@ returnIndexPage()
 
 for folder in IMAPFOLDER:    
     print(("Getting messages from server from folder: %s.") % folder)
-    get_messages_to_local_maildir(folder, mail)    
+    retries = 0
+    if ssl:
+        try:
+            get_messages_to_local_maildir(folder, mail)    
+        except imaplib.IMAP4_SSL.abort:
+            if retries < 5:
+                print(("SSL Connection Abort. Trying again (#%i).") % retries)
+                retries += 1
+                get_messages_to_local_maildir(folder, mail)
+            else:
+                print("SSL Connection gave more than 5 errors. Not trying again")
+    else:
+        try:
+            get_messages_to_local_maildir(folder, mail)    
+        except imaplib.IMAP4.abort:
+            if retries < 5:
+                print(("Connection Abort. Trying again (#%i).") % retries)
+                retries += 1
+                get_messages_to_local_maildir(folder, mail)
+            else:
+                print("Connection gave more than 5 errors. Not trying again")
+            
     print(("Done with folder: %s.") % folder)
     print("\n")
 

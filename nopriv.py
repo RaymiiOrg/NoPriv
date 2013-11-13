@@ -402,6 +402,7 @@ def moveMailDir(maildir):
 def returnWelcome():
     print("##############################################")
     print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
+    print("# version 5, released on 13-11-2013.         #")
     print("# https://raymii.org - NoPriv.py is GPLv3    #")
     print("##############################################")
     print("")

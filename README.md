@@ -41,6 +41,11 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 
 ### Changelog
 
+New in version 5:
+
+- Fix issue #22, NoPriv does not crash on empty IMAP folders anymore
+- Fix issue #23, NoPriv now tries a few times when the IMAP connection is reset. This happens with Google Mail sometimes.
+
 New in version 4:
 
 - INI style config, either per user or system wide (thanks to [https://github.com/brejoc](Jochen Breuer))

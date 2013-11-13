@@ -722,7 +722,14 @@ def backup_mails_to_html_from_local_maildir(folder):
     ## Maildir folders have dots, not slashes
     local_maildir_folder = folder.replace("/", ".")
     local_maildir = mailbox.Maildir(os.path.join(maildir), factory=None, create=True)
-    maildir_folder = local_maildir.get_folder(local_maildir_folder)
+    try:
+        maildir_folder = local_maildir.get_folder(local_maildir_folder)
+    except mailbox.NoSuchMailboxError as e:
+        print(("Error: Folder \"%s\" is probably empty or does not exists: %s.") % (folder, e))
+        createOverviewPage(folder, 1, 0)
+        addMailToOverviewPage(folder, 1, 1, "-", "-", "Error: Folder/mailbox does not exist or is empty", "01-01-1900")  
+        finishOverviewPage(folder, 1, 0, 0, 0)
+        return None
 
     ## Start with the first email
     mail_number = 1

@@ -87,6 +87,13 @@ try:
 except:
     pass
 
+offline = False
+try:
+    offline_value = config.get('nopriv', 'offline')
+    if offline_value in yes_flags: 
+        offline = True
+except:
+    pass
 
 enable_html = True
 CreateMailDir = True
@@ -284,6 +291,7 @@ def returnIndexPage():
     global IMAPLOGIN
     global IMAPSERVER
     global ssl
+    global offline
     now = datetime.datetime.now()
     with open("index.html", "w") as indexFile:
         indexFile.write(returnHeader("Email Backup Overview Page", layout=2))
@@ -307,8 +315,9 @@ def returnIndexPage():
         for folder in IMAPFOLDER:
             indexFile.write("\t<li><a href = \"" + folder + "/email-report-1.html\">" + folder + "</a></li>\n")
         indexFile.write("</ul>\n")
-        indexFile.write("<br />Available Folders:<br />")
-        indexFile.write(returnImapFolders(available=True, selected=False, html=True))
+        if not offline:
+            indexFile.write("<br />Available Folders:<br />")
+            indexFile.write(returnImapFolders(available=True, selected=False, html=True))
         if ssl:
             indexFile.write("And, you've got a good mail provider, they support SSL and your backup was made over SSL.<br />\n")
         else:
@@ -402,7 +411,9 @@ def moveMailDir(maildir):
 def returnWelcome():
     print("##############################################")
     print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
-    print("# version 5, released on 13-11-2013.         #")
+    print("# version DEV-6                    .         #")
+    if offline:
+        print("# OFFLINE MODE ENABLED                       #")
     print("# https://raymii.org - NoPriv.py is GPLv3    #")
     print("##############################################")
     print("")
@@ -821,37 +832,39 @@ def backup_mails_to_html_from_local_maildir(folder):
 
 returnWelcome()
 
-mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
-print(returnImapFolders())
+if not offline:
+    mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
+    print(returnImapFolders())
 
 returnIndexPage()
 
-for folder in IMAPFOLDER:    
-    print(("Getting messages from server from folder: %s.") % folder)
-    retries = 0
-    if ssl:
-        try:
-            get_messages_to_local_maildir(folder, mail)    
-        except imaplib.IMAP4_SSL.abort:
-            if retries < 5:
-                print(("SSL Connection Abort. Trying again (#%i).") % retries)
-                retries += 1
-                get_messages_to_local_maildir(folder, mail)
-            else:
-                print("SSL Connection gave more than 5 errors. Not trying again")
-    else:
-        try:
-            get_messages_to_local_maildir(folder, mail)    
-        except imaplib.IMAP4.abort:
-            if retries < 5:
-                print(("Connection Abort. Trying again (#%i).") % retries)
-                retries += 1
-                get_messages_to_local_maildir(folder, mail)
-            else:
-                print("Connection gave more than 5 errors. Not trying again")
-            
-    print(("Done with folder: %s.") % folder)
-    print("\n")
+if not offline:
+    for folder in IMAPFOLDER:    
+        print(("Getting messages from server from folder: %s.") % folder)
+        retries = 0
+        if ssl:
+            try:
+                get_messages_to_local_maildir(folder, mail)    
+            except imaplib.IMAP4_SSL.abort:
+                if retries < 5:
+                    print(("SSL Connection Abort. Trying again (#%i).") % retries)
+                    retries += 1
+                    get_messages_to_local_maildir(folder, mail)
+                else:
+                    print("SSL Connection gave more than 5 errors. Not trying again")
+        else:
+            try:
+                get_messages_to_local_maildir(folder, mail)    
+            except imaplib.IMAP4.abort:
+                if retries < 5:
+                    print(("Connection Abort. Trying again (#%i).") % retries)
+                    retries += 1
+                    get_messages_to_local_maildir(folder, mail)
+                else:
+                    print("Connection gave more than 5 errors. Not trying again")
+                
+        print(("Done with folder: %s.") % folder)
+        print("\n")
 
 
 for folder in IMAPFOLDER:

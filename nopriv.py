@@ -111,48 +111,21 @@ def connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD):
 
 maildir = 'NoPrivMaildir'
 
-def returnHeader(title, inclocation=inc_location, layout=1):
-    if layout is 1:
-        response = """
-<html>
-    <head>
-        <title>%s</title>
-        <script type="text/javascript" src="%s/js/jquery.1.7.2.min.js"></script>
-        <script type="text/javascript" src="%s/js/prettify.js"></script>
-        <script type="text/javascript" src="%s/js/kickstart.js"></script>
-        <link rel="stylesheet" type="text/css" href="%s/css/kickstart.css" media="all" />
-        <link rel="stylesheet" type="text/css" href="%s/css/style.css" media="all" />
-    </head>
-            <body>
-                <div id="wrap" class="clearfix">
-                    <div class="col_12">
-                        <table class=\"striped tight\" style=\"{text-align:left;}\">
-                           <thead>
-                           <tr>
-                               <th>#</th>
-                               <th>From</th>
-                               <th>To</th>
-                               <th>Subject</th>
-                               <th>Date</th>
-                               </tr>
-                           </thead>
-                           <tbody>
-        """ % (title, inclocation, inclocation, inclocation, inclocation, inclocation)
-    elif layout is 2:
-        response = """
-                <html>
-                <head>
-                    <title>%s</title>
-                    <script type="text/javascript" src="%s/js/jquery.min.js"></script>
-                    <script type="text/javascript" src="%s/js/prettify.js"></script>
-                    <script type="text/javascript" src="%s/js/kickstart.js"></script>
-                    <link rel="stylesheet" type="text/css" href="%s/css/kickstart.css" media="all" />
-                    <link rel="stylesheet" type="text/css" href="%s/css/style.css" media="all" />
-            </head>
-            <body>
-                <div id="wrap" class="clearfix">
-                    <div class="col_12">
-        """ % (title, inclocation, inclocation, inclocation, inclocation, inclocation)
+def returnHeader(title, inclocation=inc_location):
+    response = """
+           <html>
+           <head>
+               <title>%s</title>
+               <script type="text/javascript" src="%s/js/jquery.min.js"></script>
+               <script type="text/javascript" src="%s/js/prettify.js"></script>
+               <script type="text/javascript" src="%s/js/kickstart.js"></script>
+               <link rel="stylesheet" type="text/css" href="%s/css/kickstart.css" media="all" />
+               <link rel="stylesheet" type="text/css" href="%s/css/style.css" media="all" />
+       </head>
+       <body>
+           <div id="wrap" class="clearfix">
+               <div class="col_12">
+    """ % (title, inclocation, inclocation, inclocation, inclocation, inclocation)
     return response
 
 
@@ -294,7 +267,7 @@ def returnIndexPage():
     global offline
     now = datetime.datetime.now()
     with open("index.html", "w") as indexFile:
-        indexFile.write(returnHeader("Email Backup Overview Page", layout=2))
+        indexFile.write(returnHeader("Email Backup Overview Page"))
         indexFile.write("<div class=\"col_3\">\n")
         indexFile.write("<h3>Folders</h3>\n")
         indexFile.write(returnMenu("", index=True, vertical = True))
@@ -430,11 +403,20 @@ def createOverviewPage(folder, pagenumber, amountOfItems = 50):
     overview_page_name = "email-report-" + str(pagenumber) + ".html"
     overview_file_path = os.path.join(folder, overview_page_name)
     with open(overview_file_path, "w") as overview_file:
-        overview_file.write(returnHeader("Email Report " + str(pagenumber)))
+        overview_file.write(returnHeader("Email backup page #" + str(pagenumber)))
         overview_file.write(returnMenu(folder))
-        overview_file.write("<table class=\"striped\">\n\t ")
+        overview_file.write("<table class=\"table table-responsive table-striped\">")
+        overview_file.write("<thead>")
+        overview_file.write("<tr>")
+        overview_file.write("<th>#</th>")
+        overview_file.write("<th>From</th>")
+        overview_file.write("<th>To</th>")
+        overview_file.write("<th>Subject</th>")
+        overview_file.write("<th>Date</th>")
+        overview_file.write("</tr>")
+        overview_file.write("</thead>")
+        overview_file.write("<tbody>")
         overview_file.close()
-
 
 
 def addMailToOverviewPage(folder, pagenumber, mail_id, mail_from, 
@@ -587,7 +569,7 @@ def createMailPage(folder, mail_id, mail_for_page, current_page_number,
 
     mail_html_page = os.path.join(folder_path_1, "index.html")
     with open(mail_html_page, 'w') as mail_page:
-        mail_page.write(returnHeader(mail_subject + " - NoPriv.py vy Raymii.org", "../../../inc/", 2))
+        mail_page.write(returnHeader(mail_subject + " - NoPriv.py vy Raymii.org", "../../../inc/"))
         mail_page.write(returnMenu(folder_path_1))
         mail_page.write("<table>\n")
         mail_page.write("\t<tr>\n")
@@ -655,7 +637,7 @@ def save_mail_attachments_to_folders(mail_id, mail, local_folder):
         os.makedirs(os.path.join(folder, att_date, str(mail_id), "attachments/"))
  
     with open(os.path.join(folder, att_date, str(mail_id), "attachments/index.html"), "w") as att_index_file:
-        att_index_file.write(returnHeader("Attachments for mail: " + str(mail_id) + ".", "../../../../inc", 2))
+        att_index_file.write(returnHeader("Attachments for mail: " + str(mail_id) + ".", "../../../../inc"))
         att_index_file.write(returnMenu("../../../../"))
         att_index_file.write("<h1>Attachments for mail: " + str(mail_id) + "</h1>\n")
         att_index_file.write("<ul>\n")

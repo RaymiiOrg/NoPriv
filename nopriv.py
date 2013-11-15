@@ -113,30 +113,25 @@ maildir = 'NoPrivMaildir'
 
 def returnHeader(title, inclocation=inc_location):
     response = """
-           <html>
-           <head>
-               <title>%s</title>
-               <script type="text/javascript" src="%s/js/jquery.min.js"></script>
-               <script type="text/javascript" src="%s/js/prettify.js"></script>
-               <script type="text/javascript" src="%s/js/kickstart.js"></script>
-               <link rel="stylesheet" type="text/css" href="%s/css/kickstart.css" media="all" />
-               <link rel="stylesheet" type="text/css" href="%s/css/style.css" media="all" />
-       </head>
-       <body>
-           <div id="wrap" class="clearfix">
-               <div class="col_12">
-    """ % (title, inclocation, inclocation, inclocation, inclocation, inclocation)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <title>%s</title>
+        <link rel="stylesheet" type="text/css" href="%s/css/bootstrap.css" media="all" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="row">
+        <div class="col-md-12">
+    """ % (title, inclocation)
     return response
-
 
 def returnFooter():
     response = """
                     </div>
-                <div class="footer">
+                <div class="col-md-8 col-md-offset-1 footer">
                 <hr />
-                <center>
                 Email backup made by <a href="https://raymii.org/s/software/Nopriv.py.html">NoPriv.py from Raymii.org</a>
-                </center>
                 </div>
             </body>
         </html>
@@ -268,11 +263,11 @@ def returnIndexPage():
     now = datetime.datetime.now()
     with open("index.html", "w") as indexFile:
         indexFile.write(returnHeader("Email Backup Overview Page"))
-        indexFile.write("<div class=\"col_3\">\n")
+        indexFile.write("<div class=\"col-md-3 col-md-offset-1\">\n")
         indexFile.write("<h3>Folders</h3>\n")
-        indexFile.write(returnMenu("", index=True, vertical = True))
+        indexFile.write(returnMenu("", index=True, vertical = True, activeItem="index"))
         indexFile.write("</div>\n")
-        indexFile.write("<div class=\"col_7\">\n")
+        indexFile.write("<div class=\"col-md-8\">\n")
         indexFile.write("<h3>Information</h3>\n")
         indexFile.write("<p>This is your email backup. You've made it with ")
         indexFile.write("<a href=\"https://raymii.org/s/software/Nopriv.py.html\"")
@@ -288,8 +283,8 @@ def returnIndexPage():
         for folder in IMAPFOLDER:
             indexFile.write("\t<li><a href = \"" + folder + "/email-report-1.html\">" + folder + "</a></li>\n")
         indexFile.write("</ul>\n")
+        indexFile.write("<br />Available Folders:<br />")
         if not offline:
-            indexFile.write("<br />Available Folders:<br />")
             indexFile.write(returnImapFolders(available=True, selected=False, html=True))
         if ssl:
             indexFile.write("And, you've got a good mail provider, they support SSL and your backup was made over SSL.<br />\n")
@@ -334,33 +329,47 @@ def returnImapFolders(available=True, selected=True, html=False):
     return response
 
 
-def returnMenu(folderImIn, inDate = False, index = False, vertical = False):
+def returnMenu(folderImIn, inDate = False, index = False, vertical = False, activeItem = ""):
     global IMAPFOLDER
 
     folder_number = folderImIn.split('/')
+    current_folder = folder_number
     folder_number = len(folder_number)
     dotdotslash = ""
 
     if vertical:
-        response = '<ul class="menu vertical">'
+        response = '<ul class="nav nav-pills nav-stacked">'
     else:
-        response = '<ul class="menu horizontal">'
+        response = '<ul class="nav nav-pills">'
 
     if not index:
         for _ in range(int(folder_number)):
             dotdotslash += "../"
         if inDate:
             dotdotslash += "../../"
+    if index:
+        response += "\t<li class=\"active\"><a href=\"" + dotdotslash + "index.html\">Index</a></li>\n"
+    else:
         response += "\t<li><a href=\"" + dotdotslash + "index.html\">Index</a></li>\n"
 
 
     for folder in IMAPFOLDER:
-        response += "\t<li><a href=\"" + dotdotslash + folder + "/email-report-1.html\">" + folder + "</a></li>\n"
+        if folder == activeItem:
+            response += "\t<li class=\"active\"><a href=\"" + dotdotslash + folder + "/email-report-1.html\">" + folder + "</a></li>\n"
+        else:
+            response += "\t<li><a href=\"" + dotdotslash + folder + "/email-report-1.html\">" + folder + "</a></li>\n"
 
-    response += "\t<li><a href=\"javascript:history.go(-1)\">Back</a></li>\n"
+    if not index:
+        response += "\t<li><a href=\"javascript:history.go(-1)\">Back</a></li>\n"
+    else:
+        response += "\t<li><a href=\"https://raymii.org\">Raymii.org</a></li>\n"
     response += "\n</ul>\n<hr />\n"
 
     return response
+
+def remove(src):
+    if os.path.exists(src):
+        shutil.rmtree(src)
 
 def copy(src, dst):
     try:
@@ -384,9 +393,9 @@ def moveMailDir(maildir):
 def returnWelcome():
     print("##############################################")
     print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
-    print("# version DEV-6                    .         #")
     if offline:
         print("# OFFLINE MODE ENABLED                       #")
+    print("# version 6-DEV,                             #")
     print("# https://raymii.org - NoPriv.py is GPLv3    #")
     print("##############################################")
     print("")
@@ -404,7 +413,7 @@ def createOverviewPage(folder, pagenumber, amountOfItems = 50):
     overview_file_path = os.path.join(folder, overview_page_name)
     with open(overview_file_path, "w") as overview_file:
         overview_file.write(returnHeader("Email backup page #" + str(pagenumber)))
-        overview_file.write(returnMenu(folder))
+        overview_file.write(returnMenu(folder, activeItem=folder))
         overview_file.write("<table class=\"table table-responsive table-striped\">")
         overview_file.write("<thead>")
         overview_file.write("<tr>")
@@ -419,11 +428,12 @@ def createOverviewPage(folder, pagenumber, amountOfItems = 50):
         overview_file.close()
 
 
+
 def addMailToOverviewPage(folder, pagenumber, mail_id, mail_from, 
                           mail_to,  mail_subject, mail_date, 
                           mail_from_encoding = "utf-8", mail_to_encoding = "utf-8",
                           mail_subject_encoding = "utf-8", 
-                          attachment = False):
+                          attachment = False, emptyFolder = False):
     try:
         mail_subject = cgi.escape(unicode(mail_subject, mail_subject_encoding)).encode('ascii', 'xmlcharrefreplace')
         mail_to = cgi.escape(unicode(mail_to, mail_to_encoding)).encode('ascii', 'xmlcharrefreplace')
@@ -452,9 +462,11 @@ def addMailToOverviewPage(folder, pagenumber, mail_id, mail_from,
         overview_file.write("</td>\n\t\t<td>")
         overview_file.write(mail_to)
         overview_file.write("</td>\n\t\t<td>")
-        overview_file.write("<a href=\"" + email_file_path + "\">")
+        if not emptyFolder:
+            overview_file.write("<a href=\"" + email_file_path + "\">")
         overview_file.write(mail_subject)
-        overview_file.write("</a>")
+        if not emptyFolder:
+            overview_file.write("</a>")
         overview_file.write("</td>\n\t\t<td>")
         overview_file.write(str(mail_date))
         overview_file.write("</td>\n\t</tr>\n\t")
@@ -464,30 +476,27 @@ def finishOverviewPage(folder, pagenumber, previouspage, nextpage, total_message
     overview_page_name = "email-report-" + str(pagenumber) + ".html"
     overview_file_path = os.path.join(folder, overview_page_name)
     with open(overview_file_path, "a") as overview_file:
-        overview_file.write("<tr>\n")
-        overview_file.write("\t\t<td colspan=\"5\">")
-        overview_file.write("<hr class=\"alt1\" />")
-        overview_file.write("</td>\n")
-        overview_file.write("\t</tr>\n")
         overview_file.write("\t<tr>\n")
-        overview_file.write("\t\t<td colspan=\"2\">")
+        overview_file.write("\t<td></td>\n")
+        overview_file.write("\t\t<td>")
         if previouspage:
             overview_file.write("<a href = \"email-report-" + str(previouspage) + ".html\">Previous page (#" + str(previouspage) + ")</a>")
         else:
             overview_file.write("No previous page.")
         overview_file.write("</td>\n")
 
-        overview_file.write("\t\t<td colspan=\"1\">")
-        overview_file.write("Total items in folder: " + str(total_messages_in_folder))
-        overview_file.write("</td>\n")
-
-        overview_file.write("\t\t<td colspan=\"2\">")
-
+        overview_file.write("\t\t<td>")
         if nextpage:
             overview_file.write("<a href = \"email-report-" + str(nextpage) + ".html\">Next page (#" + str(nextpage) + ")</a>")
         else:
             overview_file.write("No more pages.")
+
         overview_file.write("</td>\n")
+        overview_file.write("\t\t<td>")
+        overview_file.write("Total items in folder: " + str(total_messages_in_folder))
+        overview_file.write("</td>\n")
+
+        overview_file.write("\t<td></td>\n")
 
         overview_file.write("\t</tr>")
         overview_file.write("\n</table>\n")
@@ -569,60 +578,61 @@ def createMailPage(folder, mail_id, mail_for_page, current_page_number,
 
     mail_html_page = os.path.join(folder_path_1, "index.html")
     with open(mail_html_page, 'w') as mail_page:
-        mail_page.write(returnHeader(mail_subject + " - NoPriv.py vy Raymii.org", "../../../inc/"))
-        mail_page.write(returnMenu(folder_path_1))
+        mail_page.write(returnHeader(mail_subject + " - NoPriv.py Email Backup by Raymii.org", "../../../inc/"))
+        mail_page.write(returnMenu(folder_path_1, activeItem=folder))
         mail_page.write("<table>\n")
         mail_page.write("\t<tr>\n")
-        mail_page.write("\t\t<td width = \"20%\">From: </td>\n")
-        mail_page.write("\t\t<td width = \"80%\">" + mail_from + "</td>\n")
+        mail_page.write("\t\t<td>From: </td>\n")
+        mail_page.write("\t\t<td>" + mail_from + "</td>\n")
         mail_page.write("\t<tr>\n")
 
         mail_page.write("\t<tr>\n")
-        mail_page.write("\t\t<td width = \"20%\">To: </td>\n")
-        mail_page.write("\t\t<td width = \"80%\">" + mail_to + "</td>\n")
+        mail_page.write("\t\t<td>To: </td>\n")
+        mail_page.write("\t\t<td>" + mail_to + "</td>\n")
         mail_page.write("\t<tr>\n")
 
         mail_page.write("\t<tr>\n")
-        mail_page.write("\t\t<td width = \"20%\">Subject: </td>\n")
-        mail_page.write("\t\t<td width = \"80%\">" + mail_subject + "</td>\n")
+        mail_page.write("\t\t<td>Subject: </td>\n")
+        mail_page.write("\t\t<td>" + mail_subject + "</td>\n")
+        mail_page.write("\t<tr>\n")
+
+        mail_page.write("\t<tr>\n")
+        mail_page.write("\t\t<td>Date: </td>\n")
+        mail_page.write("\t\t<td>" + mail_date + "</td>\n")
         mail_page.write("\t<tr>\n")
 
         if has_attachments:
             mail_page.write("\t<tr>\n")
-            mail_page.write("\t\t<td colspan = \"2\"><a href=\"attachments\">Click here to open the attachments.</a> </td>\n")
+            mail_page.write("\t\t<td></td><td><a href=\"attachments\">Click here to open the attachments.</a> </td>\n")
             mail_page.write("\t<tr>\n")
         mail_page.write("\t<tr><td><br /></td>\n\t\t<td><a href=\"javascript:history.go(-1)\">Go back</a></td>\n\t</tr>\n")
+        
+        mail_page.write("</table>\n")
 
         if content_of_mail['text']:
-            mail_page.write("\t<tr>\n")
-            mail_page.write("\t\t<td colspan = \"2\"><pre>")
+            mail_page.write("<pre>")
             strip_header = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", content_of_mail['text'], flags=re.DOTALL)
             strip_header = re.sub(r"(?i)</body>.*?</html>", "", strip_header, flags=re.DOTALL)
             strip_header = re.sub(r"(?i)<!DOCTYPE.*?>", "", strip_header, flags=re.DOTALL)
             strip_header = re.sub(r"(?i)POSITION: absolute;", "", strip_header, flags=re.DOTALL)
             strip_header = re.sub(r"(?i)TOP: .*?;", "", strip_header, flags=re.DOTALL)
             mail_page.write(decodestring(strip_header))
-            mail_page.write("</pre></td>\n")
-            mail_page.write("\t<tr>\n")
+            mail_page.write("</pre>\n")
             
 
         if content_of_mail['html']:
-            mail_page.write("\t<tr>\n")
-            mail_page.write("\t\t<td colspan = \"2\">")
             strip_header = re.sub(r"(?i)<html>.*?<head>.*?</head>.*?<body>", "", content_of_mail['html'], flags=re.DOTALL)
             strip_header = re.sub(r"(?i)</body>.*?</html>", "", strip_header, flags=re.DOTALL)
             strip_header = re.sub(r"(?i)<!DOCTYPE.*?>", "", strip_header, flags=re.DOTALL)
             strip_header = re.sub(r"(?i)POSITION: absolute;", "", strip_header, flags=re.DOTALL)
             strip_header = re.sub(r"(?i)TOP: .*?;", "", strip_header, flags=re.DOTALL)
             mail_page.write(decodestring(strip_header))
-            mail_page.write("</td>\n")
-            mail_page.write("\t<tr>\n")
         
-        mail_page.write("\t<tr><td><br /></td>\n\t\t<td><a href=\"javascript:history.go(-1)\">Go back</a></td>\n\t</tr>\n")
+        mail_page.write("<a href=\"javascript:history.go(-1)\">Go back</a>")
 
         mail_page.close()        
 
-def save_mail_attachments_to_folders(mail_id, mail, local_folder):
+def save_mail_attachments_to_folders(mail_id, mail, local_folder, folder):
 
     global att_count
     global last_att_filename
@@ -635,10 +645,13 @@ def save_mail_attachments_to_folders(mail_id, mail, local_folder):
 
     if not os.path.exists(os.path.join(folder, att_date, str(mail_id), "attachments/")):
         os.makedirs(os.path.join(folder, att_date, str(mail_id), "attachments/"))
+    else:
+        remove(os.path.join(folder, att_date, str(mail_id), "attachments/"))
+        os.makedirs(os.path.join(folder, att_date, str(mail_id), "attachments/"))
  
     with open(os.path.join(folder, att_date, str(mail_id), "attachments/index.html"), "w") as att_index_file:
         att_index_file.write(returnHeader("Attachments for mail: " + str(mail_id) + ".", "../../../../inc"))
-        att_index_file.write(returnMenu("../../../../"))
+        att_index_file.write(returnMenu("../../../../../", activeItem=folder))
         att_index_file.write("<h1>Attachments for mail: " + str(mail_id) + "</h1>\n")
         att_index_file.write("<ul>\n")
         att_index_file.close()
@@ -721,7 +734,7 @@ def backup_mails_to_html_from_local_maildir(folder):
     except mailbox.NoSuchMailboxError as e:
         print(("Error: Folder \"%s\" is probably empty or does not exists: %s.") % (folder, e))
         createOverviewPage(folder, 1, 0)
-        addMailToOverviewPage(folder, 1, 1, "-", "-", "Error: Folder/mailbox does not exist or is empty", "01-01-1900")  
+        addMailToOverviewPage(folder, 1, 1, "-", "-", "Error: Folder/mailbox does not exist or is empty", "01-01-1900", emptyFolder = True)  
         finishOverviewPage(folder, 1, 0, 0, 0)
         return None
 
@@ -787,7 +800,7 @@ def backup_mails_to_html_from_local_maildir(folder):
                               mail_subject_encoding = mail_subject_encoding,
                             )  
 
-        mail_has_attachment = save_mail_attachments_to_folders(mail_number, mail_for_page, folder)
+        mail_has_attachment = save_mail_attachments_to_folders(mail_number, mail_for_page, folder, folder)
 
         createMailPage(folder, mail_number, mail_for_page, current_page_number,
                        mail_from, mail_to, mail_subject, mail_date, 
@@ -817,7 +830,7 @@ returnWelcome()
 if not offline:
     mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
     print(returnImapFolders())
-
+    
 returnIndexPage()
 
 if not offline:
@@ -831,6 +844,7 @@ if not offline:
                 if retries < 5:
                     print(("SSL Connection Abort. Trying again (#%i).") % retries)
                     retries += 1
+                    mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
                     get_messages_to_local_maildir(folder, mail)
                 else:
                     print("SSL Connection gave more than 5 errors. Not trying again")
@@ -841,6 +855,7 @@ if not offline:
                 if retries < 5:
                     print(("Connection Abort. Trying again (#%i).") % retries)
                     retries += 1
+                    mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
                     get_messages_to_local_maildir(folder, mail)
                 else:
                     print("Connection gave more than 5 errors. Not trying again")
@@ -851,6 +866,7 @@ if not offline:
 
 for folder in IMAPFOLDER:
     print(("Processing folder: %s.") % folder)
+    remove(folder + "/inc")
     copy(inc_location, folder + "/inc/")
     backup_mails_to_html_from_local_maildir(folder)
     print(("Done with folder: %s.") % folder)

@@ -65,7 +65,7 @@ IMAPPASSWORD = config.get('nopriv', 'imap_password')
 if IMAPPASSWORD == "":
     IMAPPASSWORD = getpass.getpass()
 
-IMAPFOLDER = [ folder.strip() for folder in \
+IMAPFOLDER_ORIG = [ folder.strip() for folder in \
                      config.get('nopriv', 'imap_folder').split(',') \
                      if folder.strip() != "" ]
 
@@ -227,7 +227,7 @@ def get_messages_to_local_maildir(mailFolder, mail, startid = 1):
     except Exception as imaperror:
         print("Error in IMAP Query: %s." % imaperror)
         print("Does the imap folder \"%s\" exists?" % mailFolder)
-        exit()
+        return
 
     total_messages_in_mailbox = len(mdata[0].split())
     last_mail_id = 0
@@ -294,6 +294,21 @@ def returnIndexPage():
         indexFile.write("</div>")
         indexFile.write(returnFooter())
         indexFile.close()
+
+
+def allFolders(IMAPFOLDER_ORIG, mail):
+    response = []
+    if len(IMAPFOLDER_ORIG) == 1 and IMAPFOLDER_ORIG[0] == "NoPriv_All":
+        maillist = mail.list()
+        for imapFolder in sorted(maillist[1]):
+            imapFolder = re.sub(r"(?i)\(.*\)", "", imapFolder, flags=re.DOTALL)
+            imapFolder = re.sub(r"(?i)\".\"", "", imapFolder, flags=re.DOTALL)
+            imapFolder = re.sub(r"(?i)\"", "", imapFolder, flags=re.DOTALL)
+            imapFolder = imapFolder.strip()
+            response.append(imapFolder)
+    else:
+        response = IMAPFOLDER_ORIG
+    return response
 
 def returnImapFolders(available=True, selected=True, html=False):
     response = ""
@@ -395,7 +410,7 @@ def returnWelcome():
     print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
     if offline:
         print("# OFFLINE MODE ENABLED                       #")
-    print("# version 6-DEV,                             #")
+    print("# version 6                                  #")
     print("# https://raymii.org - NoPriv.py is GPLv3    #")
     print("##############################################")
     print("")
@@ -824,11 +839,11 @@ def backup_mails_to_html_from_local_maildir(folder):
 
 
 
-
 returnWelcome()
 
 if not offline:
     mail = connectToImapMailbox(IMAPSERVER, IMAPLOGIN, IMAPPASSWORD)
+    IMAPFOLDER = allFolders(IMAPFOLDER_ORIG, mail)
     print(returnImapFolders())
     
 returnIndexPage()

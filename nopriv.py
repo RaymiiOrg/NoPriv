@@ -410,7 +410,7 @@ def returnWelcome():
     print("# NoPriv.py IMAP Email Backup by Raymii.org. #")
     if offline:
         print("# OFFLINE MODE ENABLED                       #")
-    print("# version 6                                  #")
+    print("# version 6, released 17-11-2013.            #")
     print("# https://raymii.org - NoPriv.py is GPLv3    #")
     print("##############################################")
     print("")

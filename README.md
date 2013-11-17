@@ -1,10 +1,11 @@
 # NoPriv.py - HTML5 IMAP email backup
 
-NoPriv.py is a python script to backup any IMAP capable email account to a HTML archive, nicely browsable, instead of weird folders (Maildir), one huge file (mbox), only needing a web browser to view (thunderbird) and no propritary code, so you can make sure I won't steal your password.
+NoPriv.py is a python script to backup any IMAP capable email account to a bowsable HTML archive and a Maildir folder. Not one huge file (mbox), only needing a web browser to view and no propritary code, so you can make sure I won't steal your password. 
 
 ### Demo
 
-[Click here for a demo](http://sparklingnetwork.nl/nopriv/index.html)
+[Click here for a demo with the new interface](http://sparklingnetwork.nl/nopriv2/index.html)
+[Click here for a demo with the old interface](http://sparklingnetwork.nl/nopriv/index.html)
 
 ### Screenshots
 
@@ -12,16 +13,19 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 <a href = "http://i.imgur.com/8Uvrk.png"><img src="http://i.imgur.com/8Uvrk.png" width=400 height=400 /></a>
 
 #### Index page
-<a href = 'http://i.imgur.com/jFLX7.png'><img src="http://i.imgur.com/jFLX7.png" width=400 height=400 /></a>
+<a href = 'http://i.imgur.com/mQOrv8ih.png'><img src="http://i.imgur.com/mQOrv8ih.png" width=400 height=400 /></a>
 
 #### Folder Overview page 
-<a href = "http://i.imgur.com/BKHln.jpg"><img src="http://i.imgur.com/BKHln.jpg" width=400 height=400 /></a>
+<a href = "http://i.imgur.com/7gWFky1h.png"><img src="http://i.imgur.com/7gWFky1h.png" width=400 height=400 /></a>
 
 #### Email itself
-<a href = "http://imgur.com/W18fR"><img src="http://i.imgur.com/W18fR.png" width=400 height=400 /></a>
+<a href = "http://i.imgur.com/0765Xz1.png"><img src="http://i.imgur.com/0765Xz1.png" width=400 height=400 /></a>
 
 #### Attachments
-<a href="http://i.imgur.com/BnuksuE.png"><img src="http://i.imgur.com/BnuksuE.png" width=400 height=400 /></a>
+<a href="http://i.imgur.com/jAdGeeM.png"><img src="http://i.imgur.com/jAdGeeM.png" width=400 height=400 /></a>
+
+### Empty Folder
+<a href="http://i.imgur.com/NigeQ9lh.png"><img src="http://i.imgur.com/NigeQ9lh.png" width=400 height=200 /></a>
 
 #### Command Line Client (links2):
 <a href="http://i.imgur.com/gt9nH.png"><img src="http://i.imgur.com/gt9nH.png" width=400 height=400 /></a>
@@ -30,18 +34,25 @@ NoPriv.py is a python script to backup any IMAP capable email account to a HTML 
 
 - Works with any IMAP/IMAPS account
 - Supports multiple IMAP folders
-- Supports HTML email
-- Supports TEXT email
-- Supports MULTIPART email
+- Supports text, HTML and multipart email
 - Saves attachments
 - Supports incremental backups
 - Backups to HTML files for easy browsing
 - Small HTML files can be backed up to external medium more easily, and can be sent over the internet more easily.
-- Also backs up to Maildir for [easy restoring](http://wiki.colar.net/ruby_script_to_upload_convert_a_maildir_inbox_to_an_imap_server)
+- Backs up to Maildir for [easy restoring](http://wiki.colar.net/ruby_script_to_upload_convert_a_maildir_inbox_to_an_imap_server)
 
 ### Changelog
 
-New in version 5:
+New in version 6:
+(18-11-2013)
+
+- Add support to download all folders without typing them all out. Using "NoPriv_All" as foldername now downloads all available folders.
+- Fix quite a few HTML errors
+- Converted layout from HTML Kickstart to Twitter Bootstrap
+- Add offline mode (only converts the Maildir to HTML, does not try to download new email)
+
+New in version 5:  
+(13-11-2013)
 
 - Fix issue #22, NoPriv does not crash on empty IMAP folders anymore
 - Fix issue #23, NoPriv now tries a few times when the IMAP connection is reset. This happens with Google Mail sometimes.
@@ -57,7 +68,6 @@ New in version 3.1:
 New in version 3:
 
 - Supports incremental backups
-- First gets all the email from the account, then processes it.
 - If you stop the backup while running, it will now continue were it left off
 - Unread mails stay unread, but are backed up (before they were marked as read)
 - Restoring possible because it also creates a Maildir
@@ -93,6 +103,8 @@ Edit the `nopriv.ini` file with your IMAP server, login and password:
 
 If you want to use SSL to connect to IMAP, or want to use incremental backups, enable or disable the options.
 
+**If you want to backup all folders, enter `NoPriv_All` as imap_folder.**
+
 
 `Nopriv.ini` can be in the following locations:
  
@@ -116,15 +128,6 @@ If you only have a console, it works just fine in Links2 (see above screenshot):
     
     links2 ./index.html
 
-#### Mutt
-
-A sample muttrc file is included since version 3.1. This file has the maildir set up and has the solarized dark colour scheme, because I like that.
-
-First, install mutt and browse to the nopriv folder, then open mutt with the muttrc file:
-
-    mutt -F muttrc
-
-You can now browse your email. Remember to select the right folder first by pressing the `c` in mutt.
 
 ### Requirements
 
@@ -142,14 +145,13 @@ Running debian 6 which has python 2.6.6? [See here how to install python 2.7 on 
 ### Info on incremental backups
 
 If you disable incremental backups, the script will run over the folders, create a maildir, create the pages and then move the maildir to `$maildir.date` where date is a timestamp. 
-If you enable incremental backup, it will create a text file `nopriv.txt` with the mail ID's of the folder, so that it know which ID it needs to continue on the next time it is ran. Don't modify this file. If you delete emails from the folder, the incremental function will not work as expected because of differing ID's.
+If you enable incremental backup, it will create a text file `nopriv.txt` with the mail ID's of the folder, so that it know which ID it needs to continue on the next time it is ran. If you delete emails from the folder, the incremental function will not work as expected because of differing ID's.
 
 ## Info on restoring
 
-Nopriv creates a Maildir folder, which houses all your email. You can restore this maildir folder to an IMAP account either by using the script linked at the top on this page, or use a mail client like Mutt or Evolution and transport it to an imap account via there.
-
+Nopriv creates a Maildir folder, which houses all your email. You can restore this maildir folder to an IMAP account either by using the script [linked at the top on this page](http://wiki.colar.net/ruby_script_to_upload_convert_a_maildir_inbox_to_an_imap_server), or use a mail client like Mutt or Evolution and transport it to an imap account via there.
 
 ### More Info:
 
-[https://raymii.org/s/software/Nopriv.py.html](https://raymii.org/s/software/Nopriv.py.html)  
+[https://raymii.org/s/software/Nopriv.py.html](https://raymii.org/s/software/Nopriv.py.html)
 [https://github.com/RaymiiOrg/NoPriv](https://github.com/RaymiiOrg/NoPriv)

@@ -4,7 +4,7 @@ NoPriv.py is a python script to backup any IMAP capable email account to a bowsa
 
 ### Demo
 
-[Click here for a demo with the new interface](http://sparklingnetwork.nl/nopriv2/index.html)
+[Click here for a demo with the new interface](http://sparklingnetwork.nl/nopriv2/index.html)  
 [Click here for a demo with the old interface](http://sparklingnetwork.nl/nopriv/index.html)
 
 ### Screenshots
@@ -153,5 +153,5 @@ Nopriv creates a Maildir folder, which houses all your email. You can restore th
 
 ### More Info:
 
-[https://raymii.org/s/software/Nopriv.py.html](https://raymii.org/s/software/Nopriv.py.html)
+[https://raymii.org/s/software/Nopriv.py.html](https://raymii.org/s/software/Nopriv.py.html)  
 [https://github.com/RaymiiOrg/NoPriv](https://github.com/RaymiiOrg/NoPriv)

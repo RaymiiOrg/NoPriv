@@ -1,6 +1,6 @@
 # NoPriv.py - HTML5 IMAP email backup
 
-NoPriv.py is a python script to backup any IMAP capable email account to a bowsable HTML archive and a Maildir folder. Not one huge file (mbox), only needing a web browser to view and no propritary code, so you can make sure I won't steal your password. 
+NoPriv.py is a python script to backup any IMAP capable email account to a bowsable HTML archive and a Maildir folder. Not one huge file (mbox), only needing a web browser to view and no proprietary code, so you can make sure I won't steal your password. 
 
 ## Demo
 
